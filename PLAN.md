@@ -66,23 +66,23 @@ struct AuthToken {
 
 ## Implementation Phases
 
-### Phase 1: Core Infrastructure
-1. **Xcode Project Setup**
-   - Create new macOS app project
-   - Configure Info.plist for status bar app
-   - Register OAuth App with Device Flow enabled
-   - Configure OAuth App Client ID in code
+### Phase 1: Core Infrastructure ✅ COMPLETED
+1. **Xcode Project Setup** ✅
+   - ✅ Create new macOS app project (Swift Package Manager)
+   - ✅ Configure Info.plist for status bar app
+   - ✅ Register OAuth App with Device Flow enabled
+   - ✅ Configure OAuth App Client ID in code
 
-2. **Basic Status Bar**
-   - Implement NSStatusItem
-   - Create simple green/red icon system
-   - Basic click handler
+2. **Basic Status Bar** ✅
+   - ✅ Implement NSStatusItem
+   - ✅ Create simple green/red icon system
+   - ✅ Basic click handler with dropdown menu
 
-3. **OAuth Device Flow Authentication**
-   - Implement OAuth Device Flow
-   - Device code generation and user verification
-   - Token polling and retrieval
-   - Secure access token storage in Keychain
+3. **OAuth Device Flow Authentication** ✅
+   - ✅ Implement OAuth Device Flow
+   - ✅ Device code generation and user verification
+   - ✅ Token polling and retrieval
+   - ✅ Secure access token storage in Keychain
 
 ### Phase 2: Core Functionality
 1. **GitHub API Integration**
@@ -137,7 +137,7 @@ struct AuthToken {
 ### OAuth App Registration
 - Create OAuth App in developer settings
 - Enable Device Flow in OAuth App settings
-- Set required scopes: `repo`, `workflow`
+- Set required scopes: `repo` (access to private/public repositories)
 - Note Client ID (no client secret needed)
 
 ### OAuth Device Flow Authentication

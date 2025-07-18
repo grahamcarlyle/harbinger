@@ -59,9 +59,10 @@ static let clientID = "Ov23liABC123XYZ" // Your actual Client ID
 
 ## Required Scopes
 
-The app will request these scopes:
-- `repo` - Access to private repositories
-- `workflow` - Access to GitHub Actions workflows
+The app will request minimal permissions:
+- `repo` - Access to private and public repositories (read-only operations for monitoring workflows)
+
+**Note**: GitHub's OAuth scopes are coarse-grained. The `repo` scope is the minimal scope that allows reading private repositories and their Actions workflows. While this scope technically grants write access, Harbinger only performs read operations.
 
 ## Rate Limiting
 

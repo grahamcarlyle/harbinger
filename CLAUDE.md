@@ -52,12 +52,12 @@ cat /tmp/harbinger.log
 1. **GitHubOAuthConfig**: Central configuration for OAuth credentials and endpoints
 2. **KeychainHelper**: Secure storage utilities for access tokens
 3. **Current Components** (in Sources/):
-   - `main.swift` - App entry point and initialization
+   - `main.swift` - App entry point and initialization ✅ **IMPLEMENTED**
    - `AppDelegate.swift` - App lifecycle management (unused currently)
    - `StatusBarManager.swift` - Menu bar integration and UI ✅ **IMPLEMENTED**
    - `GitHubOAuthConfig.swift` - OAuth configuration and Keychain helpers ✅ **IMPLEMENTED**
+   - `AuthManager.swift` - OAuth Device Flow authentication ✅ **IMPLEMENTED**
    - `GitHubClient.swift` - GitHub API communication (planned)
-   - `AuthManager.swift` - OAuth Device Flow authentication (planned)
    - `Models.swift` - Data structures for workflows and repositories (planned)
 
 ### Data Flow
@@ -72,7 +72,7 @@ cat /tmp/harbinger.log
 
 ### OAuth Configuration
 - OAuth endpoints and scopes defined in `GitHubOAuthConfig`
-- Required scopes: `repo`, `workflow`
+- Required scopes: `repo` (access to private/public repositories and Actions workflows)
 - Client ID embedded in app (no client secret needed)
 - Device Flow configuration for polling and timeouts
 
@@ -96,3 +96,16 @@ cat /tmp/harbinger.log
 
 ### Setup Requirements
 Users simply launch Harbinger and click "Connect to GitHub" to start the OAuth Device Flow. The app displays a verification code that users enter at https://github.com/login/device to authorize access. No manual credential setup or app installation required.
+
+## Current Status
+
+**Phase 1 Complete** ✅
+- OAuth Device Flow authentication fully implemented
+- Status bar app with colored indicators working
+- Secure token storage in macOS Keychain
+- User-friendly authorization flow
+
+**Next Steps**: 
+- Implement GitHub API client for workflow monitoring
+- Add repository selection interface
+- Implement workflow status polling and display
