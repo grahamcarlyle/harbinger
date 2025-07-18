@@ -159,13 +159,100 @@ class StatusBarManager {
     }
     
     @objc private func connectToGitHub() {
-        // TODO: Implement OAuth Device Flow
         print("Connect to GitHub clicked")
         
-        // For now, simulate connection
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.updateStatusIcon(.passing)
+        // Create auth manager
+        let authManager = AuthManager()
+        
+        // Step 1: Initiate device flow
+        authManager.initiateDeviceFlow { [weak self] result in
+            switch result {
+            case .success(let (userCode, verificationURI)):
+                print("✅ Device flow initiated")
+                self?.showDeviceCodeDialog(userCode: userCode, verificationURI: verificationURI, authManager: authManager)
+                
+            case .failure(let error):
+                print("❌ Device flow failed: \(error.localizedDescription)")
+                self?.showErrorDialog(message: "Failed to start GitHub authentication: \(error.localizedDescription)")
+            }
         }
+    }
+    
+    private func showDeviceCodeDialog(userCode: String, verificationURI: String, authManager: AuthManager) {
+        let alert = NSAlert()
+        alert.messageText = "GitHub Authorization"
+        alert.informativeText = """
+        1. Go to: \(verificationURI)
+        
+        2. Enter this code: \(userCode)
+        
+        3. Click "Authorize" on the GitHub page
+        
+        This app will automatically detect when you've completed the authorization.
+        """
+        alert.addButton(withTitle: "Open GitHub")
+        alert.addButton(withTitle: "I've Done This")
+        alert.addButton(withTitle: "Cancel")
+        
+        let response = alert.runModal()
+        
+        switch response {
+        case .alertFirstButtonReturn: // Open GitHub
+            if let url = URL(string: verificationURI) {
+                NSWorkspace.shared.open(url)
+            }
+            // Start polling after opening browser
+            startTokenPolling(authManager: authManager)
+            
+        case .alertSecondButtonReturn: // I've Done This
+            // Start polling immediately
+            startTokenPolling(authManager: authManager)
+            
+        case .alertThirdButtonReturn: // Cancel
+            authManager.cancelAuthentication()
+            print("🔧 StatusBarManager: Authentication canceled")
+            
+        default:
+            break
+        }
+    }
+    
+    private func startTokenPolling(authManager: AuthManager) {
+        print("🔧 StatusBarManager: Starting token polling...")
+        
+        // Show waiting state
+        updateStatusIcon(.running)
+        
+        // Start polling for access token
+        authManager.pollForAccessToken { [weak self] result in
+            switch result {
+            case .success(let accessToken):
+                print("✅ Authentication successful!")
+                self?.updateStatusIcon(.passing)
+                self?.showSuccessDialog()
+                
+            case .failure(let error):
+                print("❌ Authentication failed: \(error.localizedDescription)")
+                self?.updateStatusIcon(.unknown)
+                self?.showErrorDialog(message: "Authentication failed: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func showSuccessDialog() {
+        let alert = NSAlert()
+        alert.messageText = "Authentication Successful"
+        alert.informativeText = "Harbinger is now connected to your GitHub account!"
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    
+    private func showErrorDialog(message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Authentication Error"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
     
     @objc private func refresh() {
