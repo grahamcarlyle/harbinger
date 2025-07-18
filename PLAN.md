@@ -15,7 +15,7 @@ Create a macOS status bar application that monitors GitHub Action workflows from
 - **Language**: Swift (native macOS development)
 - **Framework**: AppKit for status bar integration
 - **HTTP Client**: URLSession for GitHub API calls
-- **Authentication**: GitHub OAuth
+- **Authentication**: OAuth App with Device Flow
 - **Data Storage**: UserDefaults for configuration
 
 ### 2. Core Components
@@ -27,14 +27,15 @@ Create a macOS status bar application that monitors GitHub Action workflows from
 
 #### 2.2 GitHub API Client
 - Workflow runs endpoint integration (`/repos/{owner}/{repo}/actions/runs`)
-- OAuth token management with automatic refresh
+- OAuth token authentication with user access tokens
 - Rate limiting management
 - Error handling for API failures
 
 #### 2.3 Authentication Manager
-- GitHub OAuth flow implementation
-- Token storage and refresh (Keychain)
-- Custom URL scheme handling (`harbinger://auth`)
+- OAuth Device Flow implementation
+- Device code generation and polling
+- User access token management
+- Secure token storage (Keychain)
 
 #### 2.4 Configuration Manager
 - Repository list management
@@ -69,23 +70,23 @@ struct AuthToken {
 1. **Xcode Project Setup**
    - Create new macOS app project
    - Configure Info.plist for status bar app
-   - Set up custom URL scheme for OAuth
-   - Register GitHub OAuth App
+   - Register OAuth App with Device Flow enabled
+   - Configure OAuth App Client ID in code
 
 2. **Basic Status Bar**
    - Implement NSStatusItem
    - Create simple green/red icon system
    - Basic click handler
 
-3. **OAuth Authentication**
-   - Implement OAuth flow with browser redirect
-   - Handle custom URL scheme callbacks
-   - Token storage in Keychain
-   - Automatic token refresh
+3. **OAuth Device Flow Authentication**
+   - Implement OAuth Device Flow
+   - Device code generation and user verification
+   - Token polling and retrieval
+   - Secure access token storage in Keychain
 
 ### Phase 2: Core Functionality
 1. **GitHub API Integration**
-   - Implement GitHub API client with OAuth
+   - Implement GitHub API client with OAuth token authentication
    - Test with single repository
    - Handle authentication errors
 
@@ -131,33 +132,41 @@ struct AuthToken {
    - Background processing
    - Memory management
 
-## GitHub OAuth Integration
+## OAuth Device Flow Integration
 
 ### OAuth App Registration
-- Create GitHub OAuth App in developer settings
-- Set Authorization callback URL: `harbinger://auth`
-- Note Client ID and Client Secret
+- Create OAuth App in developer settings
+- Enable Device Flow in OAuth App settings
+- Set required scopes: `repo`, `workflow`
+- Note Client ID (no client secret needed)
 
-### OAuth Flow
-1. **Authorization Request**
-   - Open browser to `https://github.com/login/oauth/authorize`
-   - Parameters: `client_id`, `scope`, `redirect_uri`
-   - Scopes: `repo` (private repos) or `public_repo` (public only)
+### OAuth Device Flow Authentication
+1. **Device Code Request**
+   - App requests device and user verification codes
+   - Receives authorization URL for user verification
+   - Display user code and verification URL
 
-2. **Authorization Code Exchange**
-   - Handle redirect to `harbinger://auth?code=...`
-   - Exchange code for access token
-   - Store tokens securely in Keychain
+2. **User Verification**
+   - User visits https://github.com/login/device
+   - Enters the user verification code
+   - Authorizes the application
 
-3. **Token Refresh**
-   - Monitor token expiration
-   - Automatic refresh using refresh token
-   - Re-authenticate if refresh fails
+3. **Token Polling**
+   - App polls for authentication status
+   - Continues until user completes authorization
+   - Receives access token upon success
+
+4. **Token Management**
+   - Store access token securely in Keychain
+   - Handle token refresh (if supported)
+   - Automatic re-authentication when needed
 
 ### Required API Endpoints
+- `POST /login/device/code` - Request device and user verification codes
+- `POST /login/oauth/access_token` - Poll for access token
 - `GET /repos/{owner}/{repo}/actions/runs` - Get workflow runs
 - `GET /repos/{owner}/{repo}/actions/workflows` - Get available workflows
-- `GET /user` - Verify token validity
+- `GET /user/repos` - Get user's accessible repositories
 
 ### Rate Limiting
 - Standard GitHub API limits: 5000 requests/hour
@@ -166,10 +175,10 @@ struct AuthToken {
 
 ## Authentication
 
-### GitHub OAuth
-- **User Experience**: Click "Login with GitHub" → browser opens → authorize → done
-- **Benefits**: Familiar flow, no manual token creation
-- **Implementation**: Custom URL scheme, secure token storage
+### OAuth Device Flow
+- **User Experience**: Launch Harbinger → click "Connect to GitHub" → enter code in browser → done
+- **Benefits**: No client secrets, no manual setup, secure OAuth flow
+- **Implementation**: Device codes, user verification, access token storage
 
 ## Configuration Structure
 
@@ -218,9 +227,10 @@ struct AuthToken {
 
 ### Security
 - Store OAuth tokens in Keychain (never in plain text)
+- Store Client Secret in Keychain using KeychainHelper
+- Store Client ID in UserDefaults (not sensitive)
 - Validate OAuth state parameter
 - Handle token expiration gracefully
-- Secure Client Secret storage
 
 ### Performance
 - Background queue for API calls
