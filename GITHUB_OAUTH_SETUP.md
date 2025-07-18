@@ -12,7 +12,7 @@ You need to create a GitHub OAuth App once that all users can authorize.
    - **Application name**: `Harbinger`
    - **Homepage URL**: `https://github.com/yourusername/harbinger`
    - **Application description**: `macOS status bar monitor for GitHub Actions workflows`
-   - **Authorization callback URL**: Leave blank (not needed for Device Flow)
+   - **Authorization callback URL**: `http://localhost` (required field, but not used for Device Flow)
 
 ### Step 2: Enable Device Flow
 

@@ -3,7 +3,7 @@ import Security
 
 struct GitHubOAuthConfig {
     // OAuth App configuration - Client ID is public, no client secret needed for Device Flow
-    static let clientID = "Ov23liABC123XYZ" // Replace with your OAuth App Client ID
+    static let clientID = "Ov23li6QFftczn50i92O" // Replace with your OAuth App Client ID
     
     // GitHub OAuth Device Flow endpoints
     static let baseURL = "https://github.com"
