@@ -21,17 +21,17 @@ DerivedData
 *.xcworkspace
 !default.xcworkspace
 
-# GitHub OAuth credentials are now stored in UserDefaults
-# No need to ignore GitHubOAuthConfig.swift anymore
+# Swift Package Manager
+.build/
+
+# Generated app bundle (can be regenerated with create_app.sh)
+Harbinger.app/
 
 # CocoaPods
 Pods/
 
 # Carthage
 Carthage/Build
-
-# Swift Package Manager
-.build/
 
 # fastlane
 fastlane/report.xml

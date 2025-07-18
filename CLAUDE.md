@@ -11,20 +11,27 @@ Harbinger is a macOS status bar application that monitors GitHub Actions workflo
 - **Language**: Swift 5.0
 - **Target**: macOS 13.0+
 - **Framework**: AppKit (native macOS)
-- **Build System**: Xcode project
+- **Build System**: Swift Package Manager
 - **Package Manager**: Bun (for Node.js dependencies like Claude Code)
 
 ## Build Commands
 
 ```bash
-# Open project in Xcode
-open Harbinger.xcodeproj
+# Build the app
+swift build
 
-# Build from command line
-xcodebuild -project Harbinger.xcodeproj -scheme Harbinger -configuration Debug build
+# Run the app
+swift run
 
-# Build for release
-xcodebuild -project Harbinger.xcodeproj -scheme Harbinger -configuration Release build
+# Create app bundle
+./create_app.sh
+
+# Run app bundle
+open Harbinger.app
+
+# Debug output (when running app bundle)
+./Harbinger.app/Contents/MacOS/Harbinger > /tmp/harbinger.log 2>&1 &
+cat /tmp/harbinger.log
 ```
 
 ## Core Architecture
@@ -44,12 +51,14 @@ xcodebuild -project Harbinger.xcodeproj -scheme Harbinger -configuration Release
 ### Core Components Structure
 1. **GitHubOAuthConfig**: Central configuration for OAuth credentials and endpoints
 2. **KeychainHelper**: Secure storage utilities for access tokens
-3. **Planned Components** (from project.pbxproj):
-   - `AppDelegate.swift` - App lifecycle management
-   - `StatusBarManager.swift` - Menu bar integration and UI
-   - `GitHubClient.swift` - GitHub API communication with OAuth tokens
-   - `AuthManager.swift` - OAuth Device Flow authentication
-   - `Models.swift` - Data structures for workflows and repositories
+3. **Current Components** (in Sources/):
+   - `main.swift` - App entry point and initialization
+   - `AppDelegate.swift` - App lifecycle management (unused currently)
+   - `StatusBarManager.swift` - Menu bar integration and UI ✅ **IMPLEMENTED**
+   - `GitHubOAuthConfig.swift` - OAuth configuration and Keychain helpers ✅ **IMPLEMENTED**
+   - `GitHubClient.swift` - GitHub API communication (planned)
+   - `AuthManager.swift` - OAuth Device Flow authentication (planned)
+   - `Models.swift` - Data structures for workflows and repositories (planned)
 
 ### Data Flow
 1. User launches Harbinger and clicks "Connect to GitHub"
