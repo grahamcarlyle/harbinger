@@ -18,50 +18,63 @@ Create a macOS status bar application that monitors GitHub Action workflows from
 - **Authentication**: OAuth App with Device Flow
 - **Data Storage**: UserDefaults for configuration
 
-### 2. Core Components
+### 2. Core Components (Updated Architecture)
 
-#### 2.1 Status Bar Manager
-- `NSStatusBar` integration
-- Custom status item with colored icon
-- Click handler for dropdown menu
+#### 2.1 Project Structure ✅ IMPLEMENTED
+- **HarbingerCore Library**: Core business logic, API clients, models, authentication
+- **HarbingerApp Executable**: Minimal entry point that imports and uses HarbingerCore
+- **Comprehensive Test Suite**: Unit tests covering all major components
 
-#### 2.2 GitHub API Client
-- Workflow runs endpoint integration (`/repos/{owner}/{repo}/actions/runs`)
-- OAuth token authentication with user access tokens
-- Rate limiting management
-- Error handling for API failures
+#### 2.2 Status Bar Manager ✅ IMPLEMENTED
+- `NSStatusBar` integration with colored status indicators
+- Custom status item with green/red/yellow/white icons
+- Click handler for dropdown menu with OAuth integration
+- Copy-to-clipboard functionality for device codes
 
-#### 2.3 Authentication Manager
-- OAuth Device Flow implementation
-- Device code generation and polling
-- User access token management
-- Secure token storage (Keychain)
+#### 2.3 GitHub API Client ✅ IMPLEMENTED
+- Multiple endpoint support: `/repos/{owner}/{repo}/actions/runs`, `/repos/{owner}/{repo}/actions/workflows`, `/user/repos`
+- OAuth Bearer token authentication with fallback to unauthenticated requests
+- Comprehensive error handling (network, auth, rate limiting, API errors)
+- Automatic JSON snake_case conversion and robust response parsing
 
-#### 2.4 Configuration Manager
-- Repository list management
-- Polling interval settings
-- Workflow filtering options
+#### 2.4 Authentication Manager ✅ IMPLEMENTED
+- OAuth Device Flow implementation with copy button
+- Device code generation, user verification, and token polling
+- Secure access token storage in macOS Keychain
+- Authentication state management and error handling
 
-#### 2.5 Data Models
+#### 2.5 Data Models ✅ IMPLEMENTED
 ```swift
-struct Repository {
-    let owner: String
+// Core GitHub API Models
+public struct Repository: Codable {
     let name: String
-    let workflows: [String]? // Optional specific workflows
+    let fullName: String
+    let owner: RepositoryOwner
+    let private: Bool
+    let htmlUrl: String
+    // ... additional fields with automatic snake_case conversion
 }
 
-struct WorkflowStatus {
-    let name: String
-    let status: String // "success", "failure", "in_progress"
-    let url: String
-    let lastUpdated: Date
+public struct WorkflowRun: Codable {
+    let id: Int
+    let name: String?
+    let status: String // "completed", "in_progress", "queued"
+    let conclusion: String? // "success", "failure", "cancelled"
+    let htmlUrl: String
+    let headSha: String
+    // ... comprehensive GitHub API fields
+    
+    var statusColor: WorkflowRunStatus {
+        // Computed property for UI status indication
+    }
 }
 
-struct AuthToken {
-    let accessToken: String
-    let refreshToken: String
-    let expiresAt: Date
+public enum WorkflowRunStatus {
+    case success, failure, running, unknown
+    // Color-coded status with emoji indicators
 }
+
+// Additional models: WorkflowsResponse, Workflow, HeadCommit, etc.
 ```
 
 ## Implementation Phases
@@ -84,36 +97,44 @@ struct AuthToken {
    - ✅ Token polling and retrieval
    - ✅ Secure access token storage in Keychain
 
-### Phase 2: Core Functionality
-1. **GitHub API Integration**
-   - Implement GitHub API client with OAuth token authentication
-   - Test with single repository
-   - Handle authentication errors
+### Phase 2: Core Functionality ✅ COMPLETED
+1. **GitHub API Integration** ✅
+   - ✅ Implement GitHub API client with OAuth token authentication
+   - ✅ Support for both authenticated and unauthenticated requests (public repos)
+   - ✅ Test with public repositories (actions/runner-images, microsoft/TypeScript)
+   - ✅ Handle authentication errors, rate limiting, and API failures
+   - ✅ Comprehensive error types and logging
+   - ✅ Automatic snake_case to camelCase JSON conversion
 
-2. **Configuration System**
-   - Repository management interface
-   - Settings persistence
+2. **Architecture Improvements** ✅
+   - ✅ Restructure to library + executable pattern (HarbingerCore + HarbingerApp)
+   - ✅ Move all business logic to HarbingerCore library
+   - ✅ Create minimal executable entry point
+   - ✅ Enable comprehensive unit testing
 
-3. **Status Monitoring**
-   - Periodic polling mechanism
-   - Status aggregation logic
-   - Icon state management
+3. **Data Models & Testing** ✅
+   - ✅ Complete GitHub API models (Repository, WorkflowRun, Workflow, etc.)
+   - ✅ Comprehensive unit test suite (12 tests covering all major components)
+   - ✅ Real API integration tests with public repositories
+   - ✅ Performance testing and error handling validation
+   - ✅ Support for XCTest framework with proper toolchain configuration
 
 ### Phase 3: User Interface
-1. **Authentication UI**
-   - "Connect to GitHub" button
-   - OAuth flow progress indication
-   - Account connection status
+1. **Repository Selection Interface**
+   - Repository management interface for monitoring specific repos
+   - Add/remove repositories from monitoring list
+   - Settings persistence and configuration
 
-2. **Status Dropdown**
-   - Workflow list with statuses
-   - Clickable links to GitHub
-   - Status timestamps
-   - Refresh button
+2. **Workflow Status Display**
+   - Display real workflow statuses in status bar menu
+   - Workflow list with statuses, timestamps, and clickable GitHub links
+   - Status aggregation logic and icon state management
+   - Refresh button and real-time updates
 
-3. **Settings Interface**
-   - Repository management
-   - Polling interval configuration
+3. **Background Monitoring**
+   - Periodic polling mechanism for workflow status
+   - Background processing and notification system
+   - Efficient API usage with caching and rate limiting
 
 ### Phase 4: Polish & Features
 1. **Advanced Features**
@@ -189,11 +210,11 @@ struct AuthToken {
     {
       "owner": "username",
       "name": "repo-name",
-      "workflows": ["CI", "Deploy"] // Optional filter
+      "workflows": ["CI", "Deploy"]
     }
   ],
   "settings": {
-    "pollInterval": 300, // seconds
+    "pollInterval": 300,
     "showNotifications": true
   },
   "auth": {
@@ -201,6 +222,8 @@ struct AuthToken {
   }
 }
 ```
+
+**Note**: `workflows` array is optional for filtering specific workflows, `pollInterval` is in seconds, tokens are stored securely in Keychain.
 
 ## User Experience Flow
 
@@ -244,25 +267,29 @@ struct AuthToken {
 - Dark mode compatibility
 - Loading states during OAuth flow
 
-## Testing Strategy
+## Testing Strategy ✅ IMPLEMENTED
 
-### Unit Tests
-- GitHub API client functionality
-- OAuth token management
-- Status aggregation logic
-- Configuration management
+### Unit Tests ✅ IMPLEMENTED
+- **12 comprehensive unit tests** covering all major components
+- **GitHub API client functionality**: Real API integration tests with public repositories
+- **Model decoding tests**: JSON parsing with snake_case conversion validation
+- **Authentication state management**: OAuth configuration and token handling
+- **Performance testing**: API response time measurements
+- **Error handling validation**: Network errors, rate limiting, invalid repositories
 
-### Integration Tests
-- End-to-end OAuth flow
-- GitHub API integration
-- Error handling scenarios
-- Token refresh logic
+### Test Infrastructure ✅ IMPLEMENTED
+- **XCTest Framework**: Full unit test suite with proper Xcode toolchain integration
+- **Library Architecture Testing**: Enabled by HarbingerCore library structure
+- **Real API Testing**: Tests against live GitHub repositories (actions/runner-images, microsoft/TypeScript)
+- **Mock Data Testing**: Comprehensive JSON response validation
+- **Command Line Testing**: `swift test`
 
-### Manual Testing
-- Various repository configurations
-- Network connectivity issues
-- OAuth token expiration
-- Browser-based authentication flow
+### Test Coverage
+- ✅ **GitHubClient**: API communication, authentication, error handling
+- ✅ **Models**: All GitHub API response structures with snake_case conversion
+- ✅ **Authentication**: OAuth token state and configuration checks
+- ✅ **Performance**: API response time benchmarking
+- ✅ **Error Scenarios**: Invalid repositories, network failures, rate limiting
 
 ## Deployment
 

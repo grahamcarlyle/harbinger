@@ -11,14 +11,27 @@ let package = Package(
     products: [
         .executable(
             name: "Harbinger",
-            targets: ["Harbinger"]
+            targets: ["HarbingerApp"]
+        ),
+        .library(
+            name: "HarbingerCore",
+            targets: ["HarbingerCore"]
         )
     ],
     targets: [
         .executableTarget(
-            name: "Harbinger",
+            name: "HarbingerApp",
+            dependencies: ["HarbingerCore"],
+            path: "Sources/App"
+        ),
+        .target(
+            name: "HarbingerCore",
             dependencies: [],
-            path: "Sources"
+            path: "Sources/Core"
+        ),
+        .testTarget(
+            name: "HarbingerTests",
+            dependencies: ["HarbingerCore"]
         )
     ]
 )
