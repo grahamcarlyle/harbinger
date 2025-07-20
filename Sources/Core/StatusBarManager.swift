@@ -1,9 +1,15 @@
 import Cocoa
 
-public class StatusBarManager {
+public class StatusBarManager: NSObject {
     private var statusItem: NSStatusItem?
     private var menu: NSMenu?
     private let workflowMonitor = WorkflowMonitor()
+    
+    // Window controllers that need to be retained
+    private var settingsWindowController: RepositorySettingsWindow?
+    
+    // Authentication manager that needs to be retained
+    private var authManager: AuthManager?
     
     // Debugging components
     private let debugger = StatusBarDebugger.shared
@@ -23,8 +29,13 @@ public class StatusBarManager {
     private var repositoryStatuses: [RepositoryWorkflowStatus] = []
     private var hasErrors: Bool = false
     
-    public init() {
+    public override init() {
+        super.init()
+        
         debugger.log(.lifecycle, "StatusBarManager initialization started")
+        
+        // Print log file path for easy access
+        print("📋 Harbinger Debug Log: \(debugger.getLogFilePath())")
         
         do {
             try setupStatusBar()
@@ -202,6 +213,9 @@ public class StatusBarManager {
             let debugItem = createMenuItem(title: "🔍 Show Debug Info", action: #selector(showDebugInfo))
             menu?.addItem(debugItem)
             
+            let logFileItem = createMenuItem(title: "📄 Open Log File", action: #selector(openLogFile))
+            menu?.addItem(logFileItem)
+            
             let healthCheckItem = createMenuItem(title: "🩹 Run Health Check", action: #selector(runHealthCheck))
             menu?.addItem(healthCheckItem)
             
@@ -339,17 +353,19 @@ public class StatusBarManager {
     @objc private func connectToGitHub() {
         debugger.log(.menu, "Connect to GitHub menu item clicked")
         
-        // Create auth manager with error handling
-        let authManager = AuthManager()
+        // Create auth manager with error handling and retain it
+        authManager = AuthManager()
         
         debugger.log(.network, "Initiating OAuth device flow")
         
         // Step 1: Initiate device flow
-        authManager.initiateDeviceFlow { [weak self] result in
+        authManager?.initiateDeviceFlow { [weak self] result in
             switch result {
             case .success(let (userCode, verificationURI)):
                 self?.debugger.log(.network, "Device flow successful", context: ["userCode": userCode, "uri": verificationURI])
-                self?.showDeviceCodeDialog(userCode: userCode, verificationURI: verificationURI, authManager: authManager)
+                if let authManager = self?.authManager {
+                    self?.showDeviceCodeDialog(userCode: userCode, verificationURI: verificationURI, authManager: authManager)
+                }
                 
             case .failure(let error):
                 self?.debugger.log(.error, "Device flow failed", context: ["error": error.localizedDescription])
@@ -368,11 +384,11 @@ public class StatusBarManager {
         
         3. Click "Authorize" on the GitHub page
         
-        This app will automatically detect when you've completed the authorization.
+        4. Click "Continue" below after completing authorization
         """
         alert.addButton(withTitle: "Open GitHub")
         alert.addButton(withTitle: "Copy Code")
-        alert.addButton(withTitle: "I've Done This")
+        alert.addButton(withTitle: "Continue")
         alert.addButton(withTitle: "Cancel")
         
         let response = alert.runModal()
@@ -382,8 +398,8 @@ public class StatusBarManager {
             if let url = URL(string: verificationURI) {
                 NSWorkspace.shared.open(url)
             }
-            // Start polling after opening browser
-            startTokenPolling(authManager: authManager)
+            // Re-show dialog after opening browser
+            showDeviceCodeDialog(userCode: userCode, verificationURI: verificationURI, authManager: authManager)
             
         case .alertSecondButtonReturn: // Copy Code
             // Copy the user code to clipboard
@@ -403,9 +419,9 @@ public class StatusBarManager {
             // Re-show the authorization dialog
             showDeviceCodeDialog(userCode: userCode, verificationURI: verificationURI, authManager: authManager)
             
-        case .alertThirdButtonReturn: // I've Done This
-            // Start polling immediately
-            startTokenPolling(authManager: authManager)
+        case .alertThirdButtonReturn: // Continue
+            // Exchange device code for token
+            exchangeTokenAfterAuthorization(authManager: authManager)
             
         case NSApplication.ModalResponse(rawValue: 1003): // Cancel (fourth button)
             authManager.cancelAuthentication()
@@ -416,17 +432,17 @@ public class StatusBarManager {
         }
     }
     
-    private func startTokenPolling(authManager: AuthManager) {
-        print("🔧 StatusBarManager: Starting token polling...")
+    private func exchangeTokenAfterAuthorization(authManager: AuthManager) {
+        debugger.log(.network, "Exchanging device code for access token")
         
         // Show waiting state
         updateStatusIcon(.running)
         
-        // Start polling for access token
-        authManager.pollForAccessToken { [weak self] result in
+        // Exchange device code for access token
+        authManager.exchangeDeviceCodeForToken { [weak self] result in
             switch result {
             case .success(_):
-                print("✅ Authentication successful!")
+                self?.debugger.log(.network, "Authentication successful!")
                 self?.updateStatusIcon(.unknown)
                 self?.showSuccessDialog()
                 
@@ -435,9 +451,15 @@ public class StatusBarManager {
                 self?.rebuildMenu()
                 
             case .failure(let error):
-                print("❌ Authentication failed: \(error.localizedDescription)")
+                self?.debugger.log(.error, "Authentication failed", context: ["error": error.localizedDescription])
                 self?.updateStatusIcon(.unknown)
-                self?.showErrorDialog(message: "Authentication failed: \(error.localizedDescription)")
+                
+                // Handle specific errors with helpful messages
+                var message = "Authentication failed: \(error.localizedDescription)"
+                if case .authorizationPending = error {
+                    message = "Please complete the authorization on GitHub first, then try again."
+                }
+                self?.showErrorDialog(message: message)
             }
         }
     }
@@ -520,35 +542,61 @@ public class StatusBarManager {
     }
     
     @objc private func openSettings() {
-        print("Settings clicked")
+        debugger.log(.menu, "Settings clicked")
+        
+        // Close existing settings window if open
+        if let existingWindow = settingsWindowController {
+            existingWindow.close()
+            settingsWindowController = nil
+        }
         
         // Create and show repository settings window
-        let settingsWindow = RepositorySettingsWindow()
-        settingsWindow.showWindow(nil)
+        settingsWindowController = RepositorySettingsWindow()
+        
+        // Set up window delegate to clear our reference when closed
+        if let window = settingsWindowController?.window {
+            window.delegate = self
+        }
+        
+        settingsWindowController?.showWindow(nil)
         
         // Bring window to front
         NSApp.activate(ignoringOtherApps: true)
+        
+        debugger.log(.menu, "Repository settings window opened and retained")
     }
     
     @objc private func showDebugInfo() {
         debugger.log(.menu, "Show debug info menu item clicked")
         
         let report = debugger.generateDebugReport()
+        let logPath = debugger.getLogFilePath()
         
         let alert = NSAlert()
         alert.messageText = "Harbinger Debug Information"
-        alert.informativeText = "Debug report has been copied to clipboard and printed to console."
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Copy to Clipboard")
+        alert.informativeText = "Debug report available. Log file: \(logPath)"
+        alert.addButton(withTitle: "Copy Report")
+        alert.addButton(withTitle: "Open Log File")
+        alert.addButton(withTitle: "Cancel")
         
         let response = alert.runModal()
-        if response == .alertSecondButtonReturn {
+        switch response {
+        case .alertFirstButtonReturn:
             let pasteboard = NSPasteboard.general
             pasteboard.declareTypes([.string], owner: nil)
             pasteboard.setString(report, forType: .string)
+            
+        case .alertSecondButtonReturn:
+            debugger.openLogFile()
+            
+        default:
+            break
         }
-        
-        print(report)
+    }
+    
+    @objc private func openLogFile() {
+        debugger.log(.menu, "Open log file menu item clicked")
+        debugger.openLogFile()
     }
     
     @objc private func runHealthCheck() {
@@ -604,6 +652,10 @@ public class StatusBarManager {
         return stateVerifier?.verifyState()
     }
     
+    public func getLogFilePath() -> String {
+        return debugger.getLogFilePath()
+    }
+    
     // MARK: - Self-Healing Methods
     
     public func recreateStatusItem() {
@@ -646,6 +698,20 @@ public class StatusBarManager {
     
     private var isDebugMode: Bool {
         return ProcessInfo.processInfo.environment["HARBINGER_DEBUG"] == "1" || hasErrors
+    }
+}
+
+// MARK: - NSWindowDelegate
+
+extension StatusBarManager: NSWindowDelegate {
+    
+    public func windowWillClose(_ notification: Notification) {
+        // Clear our reference to the settings window controller when it closes
+        if let window = notification.object as? NSWindow,
+           window == settingsWindowController?.window {
+            debugger.log(.menu, "Repository settings window closing - clearing reference")
+            settingsWindowController = nil
+        }
     }
 }
 

@@ -8,12 +8,7 @@ class AuthManager {
     private var deviceCode: String?
     private var userCode: String?
     private var verificationURI: String?
-    private var pollingInterval: Int = 5
-    private var pollingTimer: Timer?
     private var expiresAt: Date?
-    
-    // Completion handlers
-    private var authCompletionHandler: ((Result<String, AuthError>) -> Void)?
     
     // MARK: - Errors
     
@@ -52,7 +47,7 @@ class AuthManager {
     // MARK: - Public Methods
     
     func initiateDeviceFlow(completion: @escaping (Result<(userCode: String, verificationURI: String), AuthError>) -> Void) {
-        print("🔧 AuthManager: Initiating device flow...")
+        StatusBarDebugger.shared.log(.network, "AuthManager: Initiating device flow")
         
         // Check if we have a valid Client ID
         guard !GitHubOAuthConfig.clientID.isEmpty else {
@@ -82,30 +77,32 @@ class AuthManager {
         }.resume()
     }
     
-    func pollForAccessToken(completion: @escaping (Result<String, AuthError>) -> Void) {
+    func exchangeDeviceCodeForToken(completion: @escaping (Result<String, AuthError>) -> Void) {
         guard let deviceCode = deviceCode else {
             completion(.failure(.invalidResponse))
             return
         }
         
-        print("🔧 AuthManager: Starting token polling...")
+        StatusBarDebugger.shared.log(.network, "AuthManager: Exchanging device code for token")
         
-        // Store completion handler
-        authCompletionHandler = completion
+        // Check if expired
+        if let expiresAt = expiresAt, Date() > expiresAt {
+            StatusBarDebugger.shared.log(.error, "AuthManager: Device code expired")
+            completion(.failure(.expiredToken))
+            return
+        }
         
-        // Start polling
-        startPolling()
+        // Make single exchange request
+        makeTokenExchangeRequest(completion: completion)
     }
     
     func cancelAuthentication() {
-        print("🔧 AuthManager: Canceling authentication...")
+        StatusBarDebugger.shared.log(.network, "AuthManager: Canceling authentication")
         
-        pollingTimer?.invalidate()
-        pollingTimer = nil
         deviceCode = nil
         userCode = nil
         verificationURI = nil
-        authCompletionHandler = nil
+        expiresAt = nil
     }
     
     // MARK: - Private Methods
@@ -149,10 +146,6 @@ class AuthManager {
             self.verificationURI = verificationURI
             self.expiresAt = Date().addingTimeInterval(TimeInterval(expiresIn))
             
-            if let interval = json?["interval"] as? Int {
-                self.pollingInterval = interval
-            }
-            
             print("✅ AuthManager: Device code received")
             print("🔧 AuthManager: User code: \(userCode)")
             print("🔧 AuthManager: Verification URI: \(verificationURI)")
@@ -165,24 +158,9 @@ class AuthManager {
         }
     }
     
-    private func startPolling() {
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(pollingInterval), repeats: true) { [weak self] _ in
-            self?.pollForToken()
-        }
-    }
-    
-    private func pollForToken() {
-        guard let deviceCode = deviceCode,
-              let expiresAt = expiresAt else {
-            authCompletionHandler?(.failure(.invalidResponse))
-            return
-        }
-        
-        // Check if expired
-        if Date() > expiresAt {
-            print("❌ AuthManager: Device code expired")
-            pollingTimer?.invalidate()
-            authCompletionHandler?(.failure(.expiredToken))
+    private func makeTokenExchangeRequest(completion: @escaping (Result<String, AuthError>) -> Void) {
+        guard let deviceCode = deviceCode else {
+            completion(.failure(.invalidResponse))
             return
         }
         
@@ -197,68 +175,79 @@ class AuthManager {
         let bodyString = "client_id=\(GitHubOAuthConfig.clientID)&device_code=\(deviceCode)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
         request.httpBody = bodyString.data(using: .utf8)
         
-        print("🔧 AuthManager: Polling for access token...")
+        StatusBarDebugger.shared.log(.network, "AuthManager: Making token exchange request")
         
         // Make request
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.handleTokenResponse(data: data, response: response, error: error)
-            }
-        }.resume()
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            StatusBarDebugger.shared.log(.network, "AuthManager: Token exchange response received")
+            self?.handleTokenResponse(data: data, response: response, error: error, completion: completion)
+        }
+        
+        StatusBarDebugger.shared.log(.network, "AuthManager: Starting token exchange task")
+        task.resume()
+        StatusBarDebugger.shared.log(.network, "AuthManager: Token exchange task resumed")
     }
     
-    private func handleTokenResponse(data: Data?, response: URLResponse?, error: Error?) {
+    private func handleTokenResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<String, AuthError>) -> Void) {
+        StatusBarDebugger.shared.log(.network, "AuthManager: handleTokenResponse called")
+        
         if let error = error {
-            print("❌ AuthManager: Token request error: \(error.localizedDescription)")
-            authCompletionHandler?(.failure(.networkError(error.localizedDescription)))
+            StatusBarDebugger.shared.log(.error, "AuthManager: Token request error", context: ["error": error.localizedDescription])
+            DispatchQueue.main.async {
+                completion(.failure(.networkError(error.localizedDescription)))
+            }
             return
         }
         
         guard let data = data else {
-            print("❌ AuthManager: No token data received")
-            authCompletionHandler?(.failure(.invalidResponse))
+            StatusBarDebugger.shared.log(.error, "AuthManager: No token data received")
+            DispatchQueue.main.async {
+                completion(.failure(.invalidResponse))
+            }
             return
+        }
+        
+        StatusBarDebugger.shared.log(.network, "AuthManager: Received token response data", context: ["dataSize": data.count])
+        
+        // Log the raw response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            StatusBarDebugger.shared.log(.network, "AuthManager: Raw response", context: ["response": responseString])
         }
         
         do {
             let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+            StatusBarDebugger.shared.log(.network, "AuthManager: JSON parsed successfully", context: ["keys": json?.keys.sorted().joined(separator: ",") ?? "none"])
             
             if let errorCode = json?["error"] as? String {
-                let error = mapGitHubError(errorCode)
-                
-                // Handle specific polling errors
-                switch error {
-                case .authorizationPending:
-                    print("🔧 AuthManager: Authorization pending, continuing to poll...")
-                    return // Continue polling
-                case .slowDown:
-                    print("🔧 AuthManager: Slowing down polling...")
-                    pollingInterval += 5
-                    return // Continue polling
-                default:
-                    print("❌ AuthManager: GitHub error: \(errorCode)")
-                    pollingTimer?.invalidate()
-                    authCompletionHandler?(.failure(error))
-                    return
+                let authError = mapGitHubError(errorCode)
+                StatusBarDebugger.shared.log(.error, "AuthManager: GitHub error", context: ["error": errorCode])
+                DispatchQueue.main.async {
+                    completion(.failure(authError))
                 }
+                return
             }
             
             guard let accessToken = json?["access_token"] as? String else {
-                print("❌ AuthManager: No access token in response")
-                authCompletionHandler?(.failure(.invalidResponse))
+                StatusBarDebugger.shared.log(.error, "AuthManager: No access token in response", context: ["availableKeys": json?.keys.sorted().joined(separator: ",") ?? "none"])
+                DispatchQueue.main.async {
+                    completion(.failure(.invalidResponse))
+                }
                 return
             }
             
             // Success! Store token and complete
-            print("✅ AuthManager: Access token received!")
+            StatusBarDebugger.shared.log(.network, "AuthManager: Access token received successfully!", context: ["tokenLength": accessToken.count])
             GitHubOAuthConfig.setAccessToken(accessToken)
             
-            pollingTimer?.invalidate()
-            authCompletionHandler?(.success(accessToken))
+            DispatchQueue.main.async {
+                completion(.success(accessToken))
+            }
             
         } catch {
-            print("❌ AuthManager: Token JSON parsing error: \(error.localizedDescription)")
-            authCompletionHandler?(.failure(.invalidResponse))
+            StatusBarDebugger.shared.log(.error, "AuthManager: Token JSON parsing error", context: ["error": error.localizedDescription])
+            DispatchQueue.main.async {
+                completion(.failure(.invalidResponse))
+            }
         }
     }
     

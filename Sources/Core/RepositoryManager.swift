@@ -37,6 +37,7 @@ public class RepositoryManager {
     
     private let userDefaults = UserDefaults.standard
     private let repositoriesKey = "HarbingerMonitoredRepositories"
+    private let gitHubClient = GitHubClient()
     
     public init() {}
     
@@ -109,7 +110,80 @@ public class RepositoryManager {
             return
         }
         
-        let gitHubClient = GitHubClient()
-        gitHubClient.getRepositories(completion: completion)
+        var allRepositories: [Repository] = []
+        var completedRequests = 0
+        let totalRequests = 2 // User repos + organizations
+        var hasError: GitHubClient.GitHubError?
+        
+        let completeIfDone = {
+            completedRequests += 1
+            if completedRequests == totalRequests {
+                if let error = hasError {
+                    completion(.failure(error))
+                } else {
+                    print("📊 RepositoryManager: Total repositories before deduplication: \(allRepositories.count)")
+                    
+                    // Remove duplicates and sort
+                    let uniqueRepos = Array(Set(allRepositories.map { $0.id })).compactMap { id in
+                        allRepositories.first { $0.id == id }
+                    }.sorted { $0.fullName < $1.fullName }
+                    
+                    print("📊 RepositoryManager: Total unique repositories after deduplication: \(uniqueRepos.count)")
+                    print("📊 RepositoryManager: Sample repositories: \(uniqueRepos.prefix(5).map { $0.fullName })")
+                    
+                    completion(.success(uniqueRepos))
+                }
+            }
+        }
+        
+        // Fetch user repositories
+        gitHubClient.getRepositories { result in
+            switch result {
+            case .success(let repos):
+                print("📊 RepositoryManager: Found \(repos.count) user repositories")
+                allRepositories.append(contentsOf: repos)
+            case .failure(let error):
+                print("❌ RepositoryManager: Failed to fetch user repositories: \(error)")
+                hasError = error
+            }
+            completeIfDone()
+        }
+        
+        // Fetch organizations, then their repositories
+        gitHubClient.getUserOrganizations { [weak self] result in
+            switch result {
+            case .success(let organizations):
+                print("📊 RepositoryManager: Found \(organizations.count) organizations: \(organizations.map { $0.login })")
+                if organizations.isEmpty {
+                    completeIfDone()
+                    return
+                }
+                
+                var orgReposCompleted = 0
+                let totalOrgs = organizations.count
+                
+                for org in organizations {
+                    print("🏢 RepositoryManager: Fetching repositories for organization: \(org.login)")
+                    self?.gitHubClient.getOrganizationRepositories(org: org.login) { orgRepoResult in
+                        switch orgRepoResult {
+                        case .success(let orgRepos):
+                            print("📊 RepositoryManager: Found \(orgRepos.count) repositories in organization \(org.login)")
+                            allRepositories.append(contentsOf: orgRepos)
+                        case .failure(let error):
+                            // Don't fail entire operation if one org fails
+                            print("❌ RepositoryManager: Failed to fetch repos for org \(org.login): \(error)")
+                        }
+                        
+                        orgReposCompleted += 1
+                        if orgReposCompleted == totalOrgs {
+                            completeIfDone()
+                        }
+                    }
+                }
+            case .failure(let error):
+                hasError = error
+                completeIfDone()
+            }
+        }
     }
 }

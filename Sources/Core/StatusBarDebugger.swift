@@ -9,8 +9,28 @@ public class StatusBarDebugger {
     
     private var debugLog: [DebugEntry] = []
     private let maxLogEntries = 1000
+    private let logFileURL: URL
     
-    private init() {}
+    private init() {
+        // Create logs directory in user's Documents folder
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let logsDirectory = documentsPath.appendingPathComponent("HarbingerLogs")
+        
+        // Create directory if it doesn't exist
+        try? FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
+        
+        // Create log file with timestamp
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        let timestamp = dateFormatter.string(from: Date())
+        logFileURL = logsDirectory.appendingPathComponent("harbinger_\(timestamp).log")
+        
+        // Write initial header
+        writeToLogFile("=== HARBINGER DEBUG LOG SESSION ===")
+        writeToLogFile("Session started: \(Date())")
+        writeToLogFile("Log file: \(logFileURL.path)")
+        writeToLogFile("=====================================\n")
+    }
     
     // MARK: - Debug Entry
     
@@ -65,7 +85,29 @@ public class StatusBarDebugger {
                     category == .verification ? "🔍" :
                     category == .healing ? "🩹" : "🔧"
         
-        print("\(prefix) \(entry.formattedOutput)")
+        let formattedOutput = "\(prefix) \(entry.formattedOutput)"
+        print(formattedOutput)
+        
+        // Write to log file
+        writeToLogFile(formattedOutput)
+    }
+    
+    private func writeToLogFile(_ message: String) {
+        let logEntry = "\(message)\n"
+        
+        if let data = logEntry.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logFileURL.path) {
+                // Append to existing file
+                if let fileHandle = try? FileHandle(forWritingTo: logFileURL) {
+                    fileHandle.seekToEndOfFile()
+                    fileHandle.write(data)
+                    fileHandle.closeFile()
+                }
+            } else {
+                // Create new file
+                try? data.write(to: logFileURL)
+            }
+        }
     }
     
     // MARK: - Debug Dump
@@ -77,6 +119,7 @@ public class StatusBarDebugger {
         HARBINGER STATUS BAR DEBUG REPORT
         ======================================
         Generated: \(DateFormatter.debugFormatter.string(from: Date()))
+        Log File: \(logFileURL.path)
         
         """
         
@@ -88,6 +131,14 @@ public class StatusBarDebugger {
         }
         
         return report
+    }
+    
+    public func getLogFilePath() -> String {
+        return logFileURL.path
+    }
+    
+    public func openLogFile() {
+        NSWorkspace.shared.open(logFileURL)
     }
     
     public func getLogEntries(category: DebugCategory? = nil, limit: Int = 100) -> [DebugEntry] {

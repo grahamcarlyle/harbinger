@@ -43,6 +43,16 @@ public struct RepositoryOwner: Codable {
     // Using automatic snake_case conversion
 }
 
+public struct Organization: Codable {
+    let login: String
+    let id: Int
+    let url: String
+    let reposUrl: String
+    let description: String?
+    
+    // Using automatic snake_case conversion
+}
+
 // MARK: - Workflow Models
 
 public struct WorkflowsResponse: Codable {
