@@ -37,10 +37,11 @@ static let clientID = "Ov23liABC123XYZ" // Your actual Client ID
 
 1. Build and run your app
 2. Click "Connect to GitHub"
-3. App should display a device code
-4. Go to https://github.com/login/device
+3. App should display a device code with "Copy Code" button
+4. Go to https://github.com/login/device (or click "Open GitHub")
 5. Enter the code and authorize
-6. App should receive the access token
+6. Return to app and click "Continue" 
+7. App should receive the access token
 
 ## Why OAuth Device Flow is Better
 
@@ -61,6 +62,12 @@ static let clientID = "Ov23liABC123XYZ" // Your actual Client ID
 
 The app will request minimal permissions:
 - `repo` - Access to private and public repositories (read-only operations for monitoring workflows)
+
+**What this enables**:
+- Read personal repositories (public and private)
+- Read organization repositories you have access to
+- Access GitHub Actions workflows and run history
+- Monitor workflow status across all your repositories
 
 **Note**: GitHub's OAuth scopes are coarse-grained. The `repo` scope is the minimal scope that allows reading private repositories and their Actions workflows. While this scope technically grants write access, Harbinger only performs read operations.
 

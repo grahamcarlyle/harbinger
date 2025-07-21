@@ -32,14 +32,18 @@ Create a macOS status bar application that monitors GitHub Action workflows from
 - Copy-to-clipboard functionality for device codes
 
 #### 2.3 GitHub API Client ✅ IMPLEMENTED
-- Multiple endpoint support: `/repos/{owner}/{repo}/actions/runs`, `/repos/{owner}/{repo}/actions/workflows`, `/user/repos`
+- Multiple endpoint support: `/repos/{owner}/{repo}/actions/runs`, `/repos/{owner}/{repo}/actions/workflows`, `/user/repos`, `/user/orgs`, `/orgs/{org}/repos`
 - OAuth Bearer token authentication with fallback to unauthenticated requests
+- Automatic pagination support for repository lists (fetches all pages, handles 400+ repositories)
+- Organization repository support with comprehensive coverage
 - Comprehensive error handling (network, auth, rate limiting, API errors)
 - Automatic JSON snake_case conversion and robust response parsing
+- Network client retention to prevent callback deallocation bugs
 
 #### 2.4 Authentication Manager ✅ IMPLEMENTED
 - OAuth Device Flow implementation with copy button
-- Device code generation, user verification, and token polling
+- Device code generation, user verification, and user-controlled token exchange
+- Secure token storage in macOS Keychain with proper retention
 - Secure access token storage in macOS Keychain
 - Authentication state management and error handling
 
@@ -172,10 +176,11 @@ public enum WorkflowRunStatus {
    - Enters the user verification code
    - Authorizes the application
 
-3. **Token Polling**
-   - App polls for authentication status
-   - Continues until user completes authorization
+3. **User-Controlled Token Exchange**
+   - User clicks "Continue" when authorization is complete
+   - App makes single token exchange request
    - Receives access token upon success
+   - No complex polling or timer management needed
 
 4. **Token Management**
    - Store access token securely in Keychain

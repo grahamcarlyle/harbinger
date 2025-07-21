@@ -40,16 +40,16 @@ No GitHub App installation needed - just authorize Harbinger directly!
 │                                         │
 │  3. Authorize Harbinger                 │
 │                                         │
-│  [Open GitHub]  [I've Done This]        │
+│  4. Click "Continue" after authorizing  │
 │                                         │
-│  Waiting for authorization...           │
+│  [Open GitHub]  [Copy Code]  [Continue] │
 └─────────────────────────────────────────┘
 ```
 
 2. Click **"Open GitHub"** or go to https://github.com/login/device
 3. Enter the verification code shown in the app
 4. Click **"Authorize"** on the GitHub page
-5. Return to Harbinger - it will automatically detect the authorization
+5. Return to Harbinger and click **"Continue"** when you've completed authorization
 
 ### Step 3: Repository Selection
 
@@ -62,12 +62,14 @@ No GitHub App installation needed - just authorize Harbinger directly!
 │                                         │
 │  Available repositories:                │
 │  ☑️ username/my-project                  │
-│  ☑️ username/another-repo                │
+│  ☑️ organization/shared-repo             │
 │  ☐ username/old-project                 │
-│  ☐ username/archived-repo               │
+│  ☐ organization/archived-repo           │
 │                                         │
-│  Only repositories with GitHub Actions │
-│  workflows are shown.                   │
+│  Includes personal and organization     │
+│  repositories you have access to.       │
+│                                         │
+│  [Add Repository Manually...]           │
 │                                         │
 │  [Start Monitoring]                     │
 └─────────────────────────────────────────┘
@@ -79,9 +81,10 @@ No GitHub App installation needed - just authorize Harbinger directly!
 ## What Gets Authorized
 
 Harbinger requests permission to:
-- **Read your repositories** (public and private)
+- **Read your repositories** (public and private, personal and organization)
 - **Read GitHub Actions workflows** (status, run history)
 - **Read workflow runs** (success, failure, in progress)
+- **Access organization repositories** (for organizations you're a member of)
 
 ## Managing Access
 

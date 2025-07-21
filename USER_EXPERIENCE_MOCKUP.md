@@ -52,9 +52,9 @@ macOS Menu Bar: [🔋] [📶] [🔊] [🟡] [🕐 2:30 PM]
 │                                         │
 │  3. Authorize Harbinger                 │
 │                                         │
-│  [Open GitHub]  [I've Done This]        │
+│  4. Click "Continue" after authorizing  │
 │                                         │
-│  Waiting for authorization...           │
+│  [Open GitHub]  [Copy Code]  [Continue] │
 │                                         │
 │  Code expires in 14:23                  │
 └─────────────────────────────────────────┘
@@ -68,12 +68,14 @@ macOS Menu Bar: [🔋] [📶] [🔊] [🟡] [🕐 2:30 PM]
 │                                         │
 │  Available repositories:                │
 │  ☑️ username/my-project                  │
-│  ☑️ username/another-repo                │
+│  ☑️ organization/shared-repo             │
 │  ☐ username/old-project                 │
-│  ☐ username/archived-repo               │
+│  ☐ organization/archived-repo           │
 │                                         │
-│  Only repositories with GitHub Actions │
-│  workflows are shown.                   │
+│  Includes personal and organization     │
+│  repositories you have access to.       │
+│                                         │
+│  [Add Repository Manually...]           │
 │                                         │
 │  [Start Monitoring]                     │
 └─────────────────────────────────────────┘

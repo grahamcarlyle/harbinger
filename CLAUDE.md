@@ -80,11 +80,18 @@ cat /tmp/harbinger.log
 6. Click reveals dropdown with detailed workflow information
 
 ### GitHub API Integration
-- **Endpoints**: `/repos/{owner}/{repo}/actions/runs`, `/repos/{owner}/{repo}/actions/workflows`, `/user/repos`
+- **Endpoints**: 
+  - `/repos/{owner}/{repo}/actions/runs` - Workflow runs for specific repository
+  - `/repos/{owner}/{repo}/actions/workflows` - Available workflows for repository
+  - `/user/repos` - User's personal repositories (paginated)
+  - `/user/orgs` - User's organizations  
+  - `/orgs/{org}/repos` - Organization repositories (paginated)
 - **Authentication**: OAuth Bearer tokens with fallback to unauthenticated for public repos
+- **Pagination**: Automatic pagination support for repository lists (100 per page, fetches all pages)
 - **Rate Limiting**: 5000 requests/hour per token (unauthenticated: 60/hour per IP)
 - **JSON Handling**: Automatic snake_case to camelCase conversion via `JSONDecoder.keyDecodingStrategy`
 - **Error Handling**: Comprehensive error types for network, auth, rate limiting, and API errors
+- **Repository Coverage**: Fetches repositories from both personal account and all organizations
 
 ## Key Configuration
 
@@ -105,18 +112,24 @@ cat /tmp/harbinger.log
 ### Testing Infrastructure
 - **Unit Tests**: Comprehensive test suite covering API clients, models, and authentication
 - **XCTest Framework**: Full integration with Swift Package Manager testing
+- **OAuth Validation Tests**: Tests validate scopes against GitHub's official list
+- **Client Retention Tests**: Prevents callback deallocation bugs by ensuring network clients are properly retained
 - **Public API Testing**: Tests work against real GitHub repositories without authentication
 - **Mock Testing**: JSON decoding tests with sample GitHub API responses
 - **Performance Testing**: API response time measurements included
+- **Pagination Testing**: Validates multi-page repository fetching and deduplication
 
 ### User Experience
-- Color-coded status: Green (passing), Red (failing), Yellow (running), White (unknown)
-- Native macOS design patterns and dark mode support
-- Clickable workflow items link to GitHub web interface
-- Copy-to-clipboard functionality for OAuth device codes
+- **Color-coded status**: Green (passing), Red (failing), Yellow (running), White (unknown)
+- **Native macOS design patterns** with dark mode support
+- **Clickable workflow items** link directly to GitHub web interface
+- **Repository management**: Browse and select from all personal and organization repositories
+- **Manual repository entry** with validation for repositories not in the main list
+- **Real-time status updates** with periodic refresh and immediate feedback
+- **Copy-to-clipboard functionality** for OAuth device codes during setup
 
 ### Setup Requirements
-Users simply launch Harbinger and click "Connect to GitHub" to start the OAuth Device Flow. The app displays a verification code that users enter at https://github.com/login/device to authorize access. No manual credential setup or app installation required.
+Users launch Harbinger and click "Connect to GitHub" to start the user-controlled OAuth Device Flow. The app displays a verification code and opens GitHub in the browser. After authorizing on GitHub, users click "Continue" in the app to complete authentication. The app then provides access to all repositories from the user's account and organizations for monitoring selection. No manual credential setup or app installation required.
 
 ## Current Status
 
@@ -134,8 +147,19 @@ Users simply launch Harbinger and click "Connect to GitHub" to start the OAuth D
 - Comprehensive unit test suite with 12 tests covering all major components
 - Library + executable architecture for better testability
 
-**Next Steps (Phase 3)**: 
-- Add repository selection interface for monitoring specific repos
-- Implement workflow status polling and aggregation logic
-- Display real workflow statuses in status bar menu
-- Add periodic refresh and background monitoring
+**Phase 3 Complete** ✅
+- User-controlled OAuth flow replacing complex polling timers
+- Repository selection interface with comprehensive organization support
+- Automatic pagination for complete repository discovery (personal + org repos)
+- Manual repository entry with validation and autocomplete
+- Real-time workflow status monitoring and aggregation
+- Status bar integration with colored indicators and detailed dropdown menu
+- Periodic background refresh with configurable intervals
+- Robust error handling and debugging infrastructure
+
+**Current Features:**
+- ✅ **Complete Repository Coverage**: Fetches all repositories from personal account and organizations (handles 400+ repos with pagination)
+- ✅ **Organization Support**: Full support for organization repositories with proper permissions
+- ✅ **Real-time Monitoring**: Active monitoring of selected repositories with workflow status updates
+- ✅ **Network Client Reliability**: Fixed callback deallocation issues ensuring consistent API responses
+- ✅ **Comprehensive Testing**: OAuth scope validation, pagination testing, and client retention verification
