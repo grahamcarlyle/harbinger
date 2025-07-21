@@ -54,7 +54,7 @@ public struct Repository: Codable {
     let name: String
     let fullName: String
     let owner: RepositoryOwner
-    let private: Bool
+    let `private`: Bool
     let htmlUrl: String
     // ... additional fields with automatic snake_case conversion
 }
