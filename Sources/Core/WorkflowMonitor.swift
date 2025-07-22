@@ -22,40 +22,33 @@ public struct RepositoryWorkflowStatus {
             return .unknown
         }
         
-        // If any workflow is failing, overall status is failure
-        if workflows.contains(where: { $0.status == .failure }) {
-            return .failure
-        }
+        // Base status on the most recent workflow run (first in the array)
+        // This matches GitHub's repository status badge behavior
+        let mostRecentWorkflow = workflows.first!
         
-        // If any workflow is running, overall status is running  
-        if workflows.contains(where: { $0.status == .running }) {
-            return .running
-        }
-        
-        // If all workflows are successful, overall status is success
-        if workflows.allSatisfy({ $0.status == .success }) {
-            return .success
-        }
-        
-        return .unknown
+        return mostRecentWorkflow.status
     }
     
     public var statusDescription: String {
-        switch overallStatus {
-        case .success:
-            return "✅ All workflows passing"
-        case .failure:
-            let failedCount = workflows.filter { $0.status == .failure }.count
-            return "❌ \(failedCount) workflow\(failedCount == 1 ? "" : "s") failing"
-        case .running:
-            let runningCount = workflows.filter { $0.status == .running }.count
-            return "🟡 \(runningCount) workflow\(runningCount == 1 ? "" : "s") running"
-        case .unknown:
+        guard !workflows.isEmpty else {
             if let error = error {
                 return "⚠️ Error: \(error)"
             } else {
                 return "⚪ No workflow data"
             }
+        }
+        
+        let mostRecentWorkflow = workflows.first!
+        
+        switch mostRecentWorkflow.status {
+        case .success:
+            return "✅ Latest workflow passed"
+        case .failure:
+            return "❌ Latest workflow failed"
+        case .running:
+            return "🟡 Workflow running"
+        case .unknown:
+            return "⚪ Status unknown"
         }
     }
 }

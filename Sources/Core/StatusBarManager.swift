@@ -102,7 +102,7 @@ public class StatusBarManager: NSObject {
         debugger.log(.lifecycle, "Setting up button properties")
         
         // Configure button with defensive checks
-        button.title = "🔴 H"
+        button.title = "" // No text, use image only
         button.action = #selector(statusBarButtonClicked)
         button.target = self
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -125,6 +125,9 @@ public class StatusBarManager: NSObject {
         // Force the status item to be visible with validation
         statusItem.isVisible = true
         statusItem.length = NSStatusItem.variableLength
+        
+        // Set initial status icon
+        updateStatusIcon(currentStatus)
         
         let statusItemContext: [String: Any] = [
             "isVisible": statusItem.isVisible,
@@ -316,8 +319,8 @@ public class StatusBarManager: NSObject {
         
         image.unlockFocus()
         
-        // Make template image for proper appearance in menu bar
-        image.isTemplate = true
+        // Don't make template image so we can show actual colors
+        image.isTemplate = false
         
         return image
     }

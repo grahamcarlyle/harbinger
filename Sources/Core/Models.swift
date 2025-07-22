@@ -118,7 +118,8 @@ public struct WorkflowRun: Codable {
     let actor: GitHubUser?
     let triggeringActor: GitHubUser?
     let runAttempt: Int?
-    let referencedWorkflows: [String]?
+    // Temporarily ignore this field since it has inconsistent structure
+    // let referencedWorkflows: [String]?
     let checkSuiteId: Int?
     let checkSuiteNodeId: String?
     let path: String?
