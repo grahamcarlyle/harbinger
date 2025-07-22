@@ -2,19 +2,18 @@ import Cocoa
 
 public class HarbingerApp {
     
-    private let statusBarManager: StatusBarManager
+    private let appDelegate: AppDelegate
     
     public init() {
         print("🚀 Starting Harbinger...")
         
-        // Create and configure the application
-        let app = NSApplication.shared
-        app.setActivationPolicy(.accessory)
+        // Create the app delegate
+        self.appDelegate = AppDelegate()
         
-        // Create the status bar manager
-        self.statusBarManager = StatusBarManager()
+        // Set the app delegate
+        NSApplication.shared.delegate = appDelegate
         
-        print("📊 Status bar manager created, app ready...")
+        print("📊 App delegate configured, ready to run...")
     }
     
     public func run() {

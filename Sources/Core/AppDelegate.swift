@@ -1,68 +1,52 @@
 import Cocoa
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+public class AppDelegate: NSObject, NSApplicationDelegate {
     
     private var statusBarManager: StatusBarManager?
+    
+    // MARK: - App Lifecycle
     
     override init() {
         super.init()
         print("🚀 AppDelegate: Initializing...")
     }
     
-    func applicationDidFinishLaunching(_ aNotification: Notification) {
+    public func applicationDidFinishLaunching(_ aNotification: Notification) {
         print("🚀 Harbinger is starting...")
         
-        // Force the app to stay running
+        // Configure as menu bar only app (no dock icon)
         NSApp.setActivationPolicy(.accessory)
-        print("📱 Set activation policy to accessory")
         
-        // Initialize status bar
+        // Initialize the status bar interface
         statusBarManager = StatusBarManager()
-        print("📊 Status bar manager initialized")
-        
-        // Check if already authenticated
-        if GitHubOAuthConfig.isConfigured {
-            print("✅ Already authenticated - access token found")
-            // TODO: Validate token and start monitoring
-        } else {
-            print("❌ Not authenticated - need to connect to GitHub")
-        }
-        
-        print("🎯 Harbinger should now be visible in menu bar")
-        
-        // Force the app to stay active
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            print("🔄 Checking status bar after 1 second...")
-            if let statusItem = self.statusBarManager?.debugStatusItem {
-                print("✅ Status item exists")
-                if let button = statusItem.button {
-                    print("✅ Status button exists")
-                    print("🔍 Button title: '\(button.title)'")
-                    print("🔍 Button image: \(button.image != nil ? "exists" : "nil")")
-                } else {
-                    print("❌ Status button is nil")
-                }
-            } else {
-                print("❌ Status item is nil")
-            }
-        }
+        print("📊 Status bar manager created, app ready...")
     }
     
-    func applicationWillTerminate(_ aNotification: Notification) {
-        // Clean up if needed
-        print("Harbinger is shutting down")
+    public func applicationWillTerminate(_ aNotification: Notification) {
+        print("🔄 Harbinger is shutting down...")
+        
+        // Clean up resources if needed
+        statusBarManager = nil
     }
     
-    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+    public func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
     }
     
-    // MARK: - URL Handling (for future OAuth callback if needed)
+    // MARK: - URL Handling
     
-    func application(_ application: NSApplication, open urls: [URL]) {
-        // Handle URL schemes if needed in the future
+    public func application(_ application: NSApplication, open urls: [URL]) {
+        // Handle URL schemes for future OAuth callback support if needed
         for url in urls {
-            print("Received URL: \(url)")
+            print("📱 AppDelegate: Received URL: \(url)")
+            // Future: Could handle harbinger:// URLs for OAuth callbacks
         }
+    }
+    
+    // MARK: - Menu Handling
+    
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Handle when user clicks the dock icon (if activation policy changes)
+        return false
     }
 }

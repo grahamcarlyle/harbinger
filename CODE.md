@@ -44,9 +44,19 @@ This is the minimal executable entry point that creates and runs the main applic
 **File: `Sources/Core/HarbingerApp.swift`**
 
 The main application class that:
-- Initializes the macOS app using `NSApplication` (equivalent to a main window manager)
-- Creates the `StatusBarManager` to handle the menu bar interface
-- Sets up the application lifecycle
+- Creates and configures the `AppDelegate`
+- Sets up the `NSApplication` delegate pattern
+- Starts the application event loop
+
+**File: `Sources/Core/AppDelegate.swift`**
+
+The `NSApplicationDelegate` that handles macOS app lifecycle events:
+- `applicationDidFinishLaunching`: Configures app as menu bar only (`.accessory` policy) and creates `StatusBarManager`
+- `applicationWillTerminate`: Cleanup when app shuts down
+- `applicationShouldHandleReopen`: Handle dock icon clicks (currently disabled for menu bar apps)
+- `application(_:open:)`: URL scheme handling for future OAuth callback support
+
+**macOS Concept:** `NSApplicationDelegate` is the standard macOS pattern for handling app lifecycle events, similar to application delegates in iOS or main classes in other frameworks.
 
 ## 2. Status Bar Management
 
