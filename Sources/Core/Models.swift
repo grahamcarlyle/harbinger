@@ -3,20 +3,23 @@ import Foundation
 // MARK: - Repository Models
 
 public struct Repository: Codable {
-    let id: Int
-    let name: String
-    let fullName: String
-    let owner: RepositoryOwner
-    let `private`: Bool
-    let htmlUrl: String
-    let description: String?
-    let fork: Bool
-    let archived: Bool
-    let disabled: Bool
-    let hasActions: Bool?
-    let defaultBranch: String
-    let language: String?
-    let updatedAt: String
+    // Essential fields only - used for repository display and monitoring
+    let name: String                // Used for API calls and display
+    let fullName: String            // Used for display and caching
+    let owner: RepositoryOwner      // Used for owner info
+    let `private`: Bool             // Used for privacy status display
+    let htmlUrl: String             // Used for clickable GitHub links
+    
+    // Commented out unused fields to make decoding more robust
+    // let id: Int
+    // let description: String?
+    // let fork: Bool
+    // let archived: Bool
+    // let disabled: Bool
+    // let hasActions: Bool?
+    // let defaultBranch: String
+    // let language: String?
+    // let updatedAt: String
     
     // Note: `private` is a Swift keyword, so we need to escape it with backticks
     
@@ -29,16 +32,20 @@ public struct Repository: Codable {
         return fullName
     }
     
-    var isActive: Bool {
-        return !archived && !disabled
-    }
+    // Removed isActive since archived/disabled fields are commented out
+    // var isActive: Bool {
+    //     return !archived && !disabled
+    // }
 }
 
 public struct RepositoryOwner: Codable {
-    let login: String
-    let id: Int
-    let avatarUrl: String
-    let type: String
+    // Essential fields only - used for owner identification
+    let login: String               // Used for API calls and display
+    
+    // Commented out unused fields to make decoding more robust
+    // let id: Int
+    // let avatarUrl: String
+    // let type: String
     
     // Using automatic snake_case conversion
 }
@@ -88,43 +95,43 @@ public struct WorkflowRunsResponse: Codable {
 }
 
 public struct WorkflowRun: Codable {
-    let id: Int
-    let name: String?
-    let headBranch: String
-    let headSha: String
-    let runNumber: Int
-    let event: String
-    let status: String
-    let conclusion: String?
-    let workflowId: Int
-    let url: String
-    let htmlUrl: String
-    let createdAt: String
-    let updatedAt: String
-    let runStartedAt: String?
-    let jobsUrl: String
-    let logsUrl: String
-    let checkSuiteUrl: String
-    let artifactsUrl: String
-    let cancelUrl: String
-    let rerunUrl: String
-    let workflowUrl: String
-    let headCommit: HeadCommit
-    let repository: WorkflowRepository
-    let headRepository: WorkflowRepository
+    // Essential fields only - used for status monitoring and display
+    let name: String?           // Used for workflow display name
+    let status: String          // Used for status checking ("in_progress", "queued", "completed")
+    let conclusion: String?     // Used for final status ("success", "failure", "cancelled")
+    let htmlUrl: String         // Used for clickable links to GitHub
+    let headSha: String         // Used for commit SHA display
     
-    // Optional fields that GitHub may include
-    let pullRequests: [PullRequest]?
-    let actor: GitHubUser?
-    let triggeringActor: GitHubUser?
-    let runAttempt: Int?
-    // Temporarily ignore this field since it has inconsistent structure
+    // Commented out unused fields to make decoding more robust
+    // let id: Int
+    // let headBranch: String
+    // let runNumber: Int
+    // let event: String
+    // let workflowId: Int
+    // let url: String
+    // let createdAt: String
+    // let updatedAt: String
+    // let runStartedAt: String?
+    // let jobsUrl: String
+    // let logsUrl: String
+    // let checkSuiteUrl: String
+    // let artifactsUrl: String
+    // let cancelUrl: String
+    // let rerunUrl: String
+    // let workflowUrl: String
+    // let headCommit: HeadCommit
+    // let repository: WorkflowRepository
+    // let headRepository: WorkflowRepository
+    // let pullRequests: [PullRequest]?
+    // let actor: GitHubUser?
+    // let triggeringActor: GitHubUser?
+    // let runAttempt: Int?
     // let referencedWorkflows: [String]?
-    let checkSuiteId: Int?
-    let checkSuiteNodeId: String?
-    let path: String?
-    let displayTitle: String?
-    let previousAttemptUrl: String?
+    // let checkSuiteId: Int?
+    // let checkSuiteNodeId: String?
+    // let path: String?
+    // let displayTitle: String?
+    // let previousAttemptUrl: String?
     
     // Using automatic snake_case conversion, so no manual CodingKeys needed
     

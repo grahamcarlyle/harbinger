@@ -123,9 +123,9 @@ public class RepositoryManager {
                 } else {
                     print("📊 RepositoryManager: Total repositories before deduplication: \(allRepositories.count)")
                     
-                    // Remove duplicates and sort
-                    let uniqueRepos = Array(Set(allRepositories.map { $0.id })).compactMap { id in
-                        allRepositories.first { $0.id == id }
+                    // Remove duplicates and sort (using fullName since id field is commented out)
+                    let uniqueRepos = Array(Set(allRepositories.map { $0.fullName })).compactMap { fullName in
+                        allRepositories.first { $0.fullName == fullName }
                     }.sorted { $0.fullName < $1.fullName }
                     
                     print("📊 RepositoryManager: Total unique repositories after deduplication: \(uniqueRepos.count)")
