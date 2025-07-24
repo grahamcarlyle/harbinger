@@ -399,6 +399,29 @@ public class RepositorySettingsWindow: NSWindowController {
         infoLabel.textColor = .secondaryLabelColor
         mainStack.addArrangedSubview(infoLabel)
         
+        // Search controls
+        let searchStack = NSStackView()
+        searchStack.orientation = .horizontal
+        searchStack.spacing = 8
+        
+        searchField = NSTextField()
+        searchField.placeholderString = "Enter repository name, owner, or keywords..."
+        searchField.delegate = self
+        searchField.target = self
+        searchField.action = #selector(searchFieldChanged)
+        
+        searchButton = NSButton(title: "Search", target: self, action: #selector(performRepositorySearch))
+        searchButton.isEnabled = false
+        
+        searchStack.addArrangedSubview(searchField)
+        searchStack.addArrangedSubview(searchButton)
+        
+        // Set search field to expand, button to stay fixed width
+        searchField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        searchButton.setContentHuggingPriority(.required, for: .horizontal)
+        
+        mainStack.addArrangedSubview(searchStack)
+        
         // Search results table - using exactly same structure as monitored table
         searchResultsTable = NSTableView()
         searchResultsTable.rowSizeStyle = .default
@@ -408,34 +431,34 @@ public class RepositorySettingsWindow: NSWindowController {
         searchResultsTable.allowsColumnReordering = false
         searchResultsTable.allowsColumnResizing = true
         
-        // Add columns with same structure as monitored table
+        // Add columns optimized for search results display
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameColumn.title = "Repository"
-        nameColumn.width = 350
-        nameColumn.minWidth = 200
+        nameColumn.width = 200
+        nameColumn.minWidth = 150
         nameColumn.resizingMask = .autoresizingMask
         searchResultsTable.addTableColumn(nameColumn)
         
-        let typeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("type"))
-        typeColumn.title = "Type"
-        typeColumn.width = 80
-        typeColumn.minWidth = 70
-        typeColumn.resizingMask = .autoresizingMask
-        searchResultsTable.addTableColumn(typeColumn)
+        let descriptionColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("description"))
+        descriptionColumn.title = "Description"
+        descriptionColumn.width = 300
+        descriptionColumn.minWidth = 200
+        descriptionColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(descriptionColumn)
         
-        let statusColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
-        statusColumn.title = "Last Status"
-        statusColumn.width = 120
-        statusColumn.minWidth = 100
-        statusColumn.resizingMask = .autoresizingMask
-        searchResultsTable.addTableColumn(statusColumn)
+        let languageColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("language"))
+        languageColumn.title = "Language"
+        languageColumn.width = 100
+        languageColumn.minWidth = 80
+        languageColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(languageColumn)
         
-        let addedColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("added"))
-        addedColumn.title = "Added"
-        addedColumn.width = 120
-        addedColumn.minWidth = 100
-        addedColumn.resizingMask = .autoresizingMask
-        searchResultsTable.addTableColumn(addedColumn)
+        let starsColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("stars"))
+        starsColumn.title = "Stars"
+        starsColumn.width = 80
+        starsColumn.minWidth = 60
+        starsColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(starsColumn)
         
         let scrollView = NSScrollView()
         scrollView.documentView = searchResultsTable
@@ -451,11 +474,12 @@ public class RepositorySettingsWindow: NSWindowController {
         // Force the table to size its columns to fill available width
         searchResultsTable.sizeLastColumnToFit()
         
-        // Remove button - exactly like Monitored tab
-        let removeButton = NSButton(title: "Remove Selected Repository", target: self, action: #selector(addSearchRepository))
-        removeButton.isEnabled = false
-        removeButton.translatesAutoresizingMaskIntoConstraints = false
-        tabContent.addSubview(removeButton)
+        // Add button - for adding search results to monitored repositories
+        let addButton = NSButton(title: "Add Selected Repository", target: self, action: #selector(addSearchRepository))
+        addButton.isEnabled = false
+        addButton.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(addButton)
+        tabAddButtons.append(addButton)
         
         // CRITICAL FIX: Activate all constraints in single call to avoid ambiguous layout
         NSLayoutConstraint.activate([
@@ -470,10 +494,10 @@ public class RepositorySettingsWindow: NSWindowController {
             scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
             scrollView.heightAnchor.constraint(equalToConstant: 400),
             
-            // Button positioning (depends on scroll view)
-            removeButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
-            removeButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
-            removeButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+            // Button positioning (depends on scroll view)  
+            addButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            addButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            addButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
         ])
         
         // ROBUST FIX: Add explicit tab content constraints to prevent NSTabView sizing issues
@@ -851,7 +875,7 @@ public class RepositorySettingsWindow: NSWindowController {
                     organizationChanged()
                 }
             }
-        case "search":
+        case "searchtest":
             // Clear previous search results
             searchResults = []
             searchResultsTable.reloadData()
@@ -968,7 +992,7 @@ public class RepositorySettingsWindow: NSWindowController {
             tabAddButtons[0].isEnabled = personalTableView.selectedRow >= 0
         case "organizations":
             tabAddButtons[1].isEnabled = orgTableView.selectedRow >= 0
-        case "search":
+        case "searchtest":
             tabAddButtons[2].isEnabled = searchResultsTable.selectedRow >= 0
         case "monitored":
             monitoredRemoveButton.isEnabled = monitoredTableView.selectedRow >= 0
@@ -1172,7 +1196,7 @@ extension RepositorySettingsWindow: NSTabViewDelegate {
             if GitHubOAuthConfig.isConfigured && userOrganizations.isEmpty {
                 loadUserOrganizations()
             }
-        case "search":
+        case "searchtest":
             // Nothing to load automatically for search tab
             break
         case "monitored":

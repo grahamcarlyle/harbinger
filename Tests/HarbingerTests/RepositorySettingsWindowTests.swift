@@ -448,6 +448,167 @@ final class RepositorySettingsWindowTests: XCTestCase {
         }
     }
 
+    func testSearchResultsTableDataPopulation() {
+        // Switch to the search tab
+        switchToTab(identifier: "searchtest")
+        
+        // Create test search results
+        let testSearchResults = [
+            Repository(
+                name: "react",
+                fullName: "facebook/react",
+                owner: RepositoryOwner(login: "facebook"),
+                private: false,
+                htmlUrl: "https://github.com/facebook/react",
+                description: "The library for web and native user interfaces",
+                language: "JavaScript",
+                stargazersCount: 225000
+            ),
+            Repository(
+                name: "vue",
+                fullName: "vuejs/vue",
+                owner: RepositoryOwner(login: "vuejs"),
+                private: false,
+                htmlUrl: "https://github.com/vuejs/vue",
+                description: "Vue.js is a progressive, incrementally-adoptable JavaScript framework",
+                language: "JavaScript",
+                stargazersCount: 207000
+            )
+        ]
+        
+        // Set test data
+        settingsWindow.setTestData(searchResults: testSearchResults)
+        
+        // Allow UI to update
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
+        
+        guard let contentView = settingsWindow.window?.contentView,
+              let tabView = findTabView(in: contentView) else {
+            XCTFail("Could not find tab view")
+            return
+        }
+        
+        let (_, searchTableView) = findScrollAndTableViews(in: tabView.selectedTabViewItem?.view ?? NSView())
+        
+        guard let tableView = searchTableView else {
+            XCTFail("Could not find search results table view")
+            return
+        }
+        
+        // Verify table has the expected number of rows
+        let rowCount = tableView.numberOfRows
+        XCTAssertEqual(rowCount, 2, "Search results table should have 2 rows")
+        print("✅ Search results table has \(rowCount) rows")
+        
+        // Verify column count and identifiers
+        let columnCount = tableView.numberOfColumns
+        XCTAssertEqual(columnCount, 4, "Search results table should have 4 columns")
+        
+        let expectedColumns = ["name", "description", "language", "stars"]
+        for (index, expectedId) in expectedColumns.enumerated() {
+            let column = tableView.tableColumns[index]
+            XCTAssertEqual(column.identifier.rawValue, expectedId, "Column \(index) should have identifier '\(expectedId)'")
+        }
+        print("✅ Search results table has correct columns: \(tableView.tableColumns.map { $0.identifier.rawValue })")
+        
+        // Force table to create views for first row
+        tableView.reloadData()
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+        
+        // Verify data in specific cells
+        if rowCount > 0 {
+            print("🔍 Checking first row cell data...")
+            
+            // Check first row data
+            if let nameCell = tableView.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTableCellView,
+               let nameTextField = nameCell.textField {
+                XCTAssertEqual(nameTextField.stringValue, "facebook/react", "First row name should be 'facebook/react'")
+                print("✅ First row name: '\(nameTextField.stringValue)'")
+            } else {
+                print("⚠️ Could not get name cell for first row")
+            }
+            
+            if let descCell = tableView.view(atColumn: 1, row: 0, makeIfNecessary: true) as? NSTableCellView,
+               let descTextField = descCell.textField {
+                XCTAssertTrue(descTextField.stringValue.contains("library"), "First row description should contain 'library'")
+                print("✅ First row description: '\(descTextField.stringValue)'")
+            } else {
+                print("⚠️ Could not get description cell for first row")
+            }
+            
+            if let langCell = tableView.view(atColumn: 2, row: 0, makeIfNecessary: true) as? NSTableCellView,
+               let langTextField = langCell.textField {
+                XCTAssertEqual(langTextField.stringValue, "JavaScript", "First row language should be 'JavaScript'")
+                print("✅ First row language: '\(langTextField.stringValue)'")
+            } else {
+                print("⚠️ Could not get language cell for first row")
+            }
+            
+            if let starsCell = tableView.view(atColumn: 3, row: 0, makeIfNecessary: true) as? NSTableCellView,
+               let starsTextField = starsCell.textField {
+                XCTAssertTrue(starsTextField.stringValue.contains("225"), "First row stars should contain '225'")
+                print("✅ First row stars: '\(starsTextField.stringValue)'")
+            } else {
+                print("⚠️ Could not get stars cell for first row")
+            }
+        }
+    }
+
+    func testPublicSearchTabHasSearchField() {
+        // Switch to the search tab
+        switchToTab(identifier: "searchtest")
+        
+        // Allow UI to update
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+        
+        guard let contentView = settingsWindow.window?.contentView,
+              let tabView = findTabView(in: contentView) else {
+            XCTFail("Could not find tab view")
+            return
+        }
+        
+        guard let searchTabContent = tabView.selectedTabViewItem?.view else {
+            XCTFail("Could not find search tab content view")
+            return
+        }
+        
+        // Look for search field in the tab content
+        var foundSearchField: NSTextField?
+        var foundSearchButton: NSButton?
+        
+        func findSearchControls(in view: NSView) {
+            for subview in view.subviews {
+                if let textField = subview as? NSTextField,
+                   textField.placeholderString?.contains("repository name") == true {
+                    foundSearchField = textField
+                } else if let button = subview as? NSButton,
+                          button.title == "Search" {
+                    foundSearchButton = button
+                }
+                // Recursively search subviews
+                findSearchControls(in: subview)
+            }
+        }
+        
+        findSearchControls(in: searchTabContent)
+        
+        // Verify search field exists and has correct properties
+        XCTAssertNotNil(foundSearchField, "Search field should exist in Public Search tab")
+        XCTAssertNotNil(foundSearchButton, "Search button should exist in Public Search tab")
+        
+        if let searchField = foundSearchField {
+            XCTAssertNotNil(searchField.placeholderString, "Search field should have placeholder text")
+            XCTAssertTrue(searchField.placeholderString?.contains("repository") == true, "Placeholder should mention repositories")
+            print("✅ Search field found with placeholder: '\(searchField.placeholderString ?? "none")'")
+        }
+        
+        if let searchButton = foundSearchButton {
+            XCTAssertEqual(searchButton.title, "Search", "Search button should have 'Search' title")
+            XCTAssertFalse(searchButton.isEnabled, "Search button should be disabled initially")
+            print("✅ Search button found with title: '\(searchButton.title)', enabled: \(searchButton.isEnabled)")
+        }
+    }
+
     // MARK: - NSTabView Intrinsic Content Size Investigation
     
     func testNSTabViewIntrinsicContentSizeApproach() {
