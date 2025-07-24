@@ -197,10 +197,17 @@ public class RepositorySettingsWindow: NSWindowController {
         
         let visibilityColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("visibility"))
         visibilityColumn.title = "Visibility"
-        visibilityColumn.width = 100
-        visibilityColumn.minWidth = 80
+        visibilityColumn.width = 80
+        visibilityColumn.minWidth = 60
         visibilityColumn.resizingMask = .autoresizingMask
         personalTableView.addTableColumn(visibilityColumn)
+        
+        let workflowsColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("workflows"))
+        workflowsColumn.title = "Workflows"
+        workflowsColumn.width = 80
+        workflowsColumn.minWidth = 60
+        workflowsColumn.resizingMask = .autoresizingMask
+        personalTableView.addTableColumn(workflowsColumn)
         
         let languageColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("language"))
         languageColumn.title = "Language"
@@ -313,10 +320,17 @@ public class RepositorySettingsWindow: NSWindowController {
         
         let visibilityColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("visibility"))
         visibilityColumn.title = "Visibility"
-        visibilityColumn.width = 100
-        visibilityColumn.minWidth = 80
+        visibilityColumn.width = 80
+        visibilityColumn.minWidth = 60
         visibilityColumn.resizingMask = .autoresizingMask
         orgTableView.addTableColumn(visibilityColumn)
+        
+        let workflowsColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("workflows"))
+        workflowsColumn.title = "Workflows"
+        workflowsColumn.width = 80
+        workflowsColumn.minWidth = 60
+        workflowsColumn.resizingMask = .autoresizingMask
+        orgTableView.addTableColumn(workflowsColumn)
         
         let languageColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("language"))
         languageColumn.title = "Language"
@@ -459,6 +473,13 @@ public class RepositorySettingsWindow: NSWindowController {
         starsColumn.minWidth = 60
         starsColumn.resizingMask = .autoresizingMask
         searchResultsTable.addTableColumn(starsColumn)
+        
+        let workflowsColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("workflows"))
+        workflowsColumn.title = "Workflows"
+        workflowsColumn.width = 80
+        workflowsColumn.minWidth = 60
+        workflowsColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(workflowsColumn)
         
         let scrollView = NSScrollView()
         scrollView.documentView = searchResultsTable
@@ -652,6 +673,8 @@ public class RepositorySettingsWindow: NSWindowController {
                 case .success(let repositories):
                     self?.personalRepositories = repositories
                     self?.personalTableView.reloadData()
+                    // Preload workflow status for all repositories to avoid lag when scrolling
+                    self?.preloadWorkflowStatus(for: repositories)
                     
                 case .failure(let error):
                     self?.showError("Failed to fetch personal repositories: \(error.localizedDescription)")
@@ -700,6 +723,8 @@ public class RepositorySettingsWindow: NSWindowController {
                 case .success(let repositories):
                     self?.selectedOrgRepositories = repositories
                     self?.orgTableView.reloadData()
+                    // Preload workflow status for all repositories to avoid lag when scrolling
+                    self?.preloadWorkflowStatus(for: repositories)
                     
                 case .failure(let error):
                     self?.showError("Failed to fetch repositories for \(orgLogin): \(error.localizedDescription)")
@@ -811,6 +836,8 @@ public class RepositorySettingsWindow: NSWindowController {
                 case .success(let searchResponse):
                     self.searchResults = searchResponse.items
                     self.searchResultsTable.reloadData()
+                    // Preload workflow status for search results to avoid lag when scrolling
+                    self.preloadWorkflowStatus(for: searchResponse.items)
                     
                     StatusBarDebugger.shared.log(.menu, "Repository search completed", context: [
                         "query": query,
@@ -1024,6 +1051,29 @@ public class RepositorySettingsWindow: NSWindowController {
         }
     }
     
+    // MARK: - Workflow Detection Preloading
+    
+    private func preloadWorkflowStatus(for repositories: [Repository]) {
+        // Only preload for repositories that don't already have cached status
+        let pendingRepositories = repositories.filter { repository in
+            // Only check viable repositories that don't have cached workflow status
+            repository.isBasicallyViable && WorkflowDetectionService.shared.getCachedWorkflowStatus(for: repository) == nil
+        }
+        
+        print("🔄 Preloading workflow status for \(pendingRepositories.count) repositories")
+        
+        // Trigger workflow detection for all pending repositories
+        // The WorkflowDetectionService will handle batching and rate limiting
+        for repository in pendingRepositories {
+            repository.checkWorkflowViability { [weak self] hasWorkflows in
+                DispatchQueue.main.async {
+                    // Reload the specific row to update the UI
+                    self?.reloadRepositoryRow(repository: repository)
+                }
+            }
+        }
+    }
+    
 }
 
 // MARK: - NSTextFieldDelegate
@@ -1143,15 +1193,8 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             secondaryTextColor = .quaternaryLabelColor
         }
         
-        // Only trigger workflow detection for pending repositories (not for every cell render)
-        if isPending {
-            repository.checkWorkflowViability { [weak self] hasWorkflows in
-                DispatchQueue.main.async {
-                    // Reload the row to update appearance based on workflow detection
-                    self?.reloadRepositoryRow(repository: repository)
-                }
-            }
-        }
+        // Note: Workflow detection is now handled by preloading when repositories are loaded
+        // This prevents lag when scrolling and avoids duplicate API calls
         
         switch identifier {
         case "name":
@@ -1166,24 +1209,28 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
             textField.textColor = baseTextColor
         case "visibility":
-            var visibilityText = repository.private ? "Private" : "Public"
-            
-            // Add indicators for different states
-            if isPending {
-                visibilityText += " (Detecting...)"
-            } else if !isViable {
-                if repository.archived == true {
-                    visibilityText += " (Archived)"
-                } else if repository.disabled == true {
-                    visibilityText += " (Disabled)"
-                } else {
-                    visibilityText += " (No workflows)"
-                }
-            }
-            
-            textField.stringValue = visibilityText
+            textField.stringValue = repository.private ? "Private" : "Public"
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = secondaryTextColor
+        case "workflows":
+            if repository.archived == true {
+                textField.stringValue = "—"
+                textField.textColor = .tertiaryLabelColor
+            } else if repository.disabled == true {
+                textField.stringValue = "—"
+                textField.textColor = .tertiaryLabelColor
+            } else if isPending {
+                textField.stringValue = "?"
+                textField.textColor = .systemBlue
+            } else if isViable {
+                textField.stringValue = "✓"
+                textField.textColor = .systemGreen
+            } else {
+                textField.stringValue = "✗"
+                textField.textColor = .systemRed
+            }
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.alignment = .center
         case "language":
             textField.stringValue = repository.language ?? "—"
             textField.font = NSFont.systemFont(ofSize: 11)
@@ -1220,15 +1267,8 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             secondaryTextColor = .quaternaryLabelColor
         }
         
-        // Only trigger workflow detection for pending repositories
-        if isPending {
-            repository.checkWorkflowViability { [weak self] hasWorkflows in
-                DispatchQueue.main.async {
-                    // Reload the row to update appearance based on workflow detection
-                    self?.reloadRepositoryRow(repository: repository)
-                }
-            }
-        }
+        // Note: Workflow detection is now handled by preloading when repositories are loaded
+        // This prevents lag when scrolling and avoids duplicate API calls
         
         switch identifier {
         case "name":
@@ -1275,6 +1315,25 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = secondaryTextColor
             textField.alignment = .right
+        case "workflows":
+            if repository.archived == true {
+                textField.stringValue = "—"
+                textField.textColor = .tertiaryLabelColor
+            } else if repository.disabled == true {
+                textField.stringValue = "—"
+                textField.textColor = .tertiaryLabelColor
+            } else if isPending {
+                textField.stringValue = "?"
+                textField.textColor = .systemBlue
+            } else if isViable {
+                textField.stringValue = "✓"
+                textField.textColor = .systemGreen
+            } else {
+                textField.stringValue = "✗"
+                textField.textColor = .systemRed
+            }
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.alignment = .center
         default:
             break
         }
