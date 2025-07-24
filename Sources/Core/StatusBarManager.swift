@@ -529,8 +529,12 @@ public class StatusBarManager: NSObject {
         
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            // Clear the stored token
-            GitHubOAuthConfig.clearCredentials()
+            // Clear the stored token and all cached data
+            let gitHubClient = GitHubClient()
+            gitHubClient.clearAuthentication()
+            
+            // Clear workflow detection cache
+            WorkflowDetectionService.shared.clearCache()
             
             // Stop monitoring
             workflowMonitor.stopMonitoring()

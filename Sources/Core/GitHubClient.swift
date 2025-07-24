@@ -6,6 +6,7 @@ public class GitHubClient {
     
     private let session: URLSession
     private let baseURL = GitHubOAuthConfig.apiBaseURL
+    private let userDefaults = UserDefaults.standard
     
     // MARK: - Initialization
     
@@ -82,11 +83,40 @@ public class GitHubClient {
     }
     
     public func getRepositories(completion: @escaping (Result<[Repository], GitHubError>) -> Void) {
+        let cacheKey = "CachedPersonalRepositories"
+        
+        // Try to load from cache first
+        if let cachedRepos = loadRepositoriesFromCache(key: cacheKey) {
+            print("🔄 GitHubClient: Loaded \(cachedRepos.count) personal repositories from cache")
+            completion(.success(cachedRepos))
+            return
+        }
+        
+        print("🔄 GitHubClient: Cache miss, fetching personal repositories from API")
         // Use type=owner to get only repositories owned by the authenticated user (not organization repos)
-        fetchAllRepositories(url: "\(baseURL)/user/repos?type=owner", completion: completion)
+        fetchAllRepositories(url: "\(baseURL)/user/repos?type=owner") { [weak self] result in
+            switch result {
+            case .success(let repositories):
+                self?.saveRepositoriesToCache(repositories: repositories, key: cacheKey)
+                completion(.success(repositories))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
     }
     
     public func getUserOrganizations(completion: @escaping (Result<[Organization], GitHubError>) -> Void) {
+        let cacheKey = "CachedUserOrganizations"
+        
+        // Try to load from cache first
+        if let cachedOrgs = loadOrganizationsFromCache(key: cacheKey) {
+            print("🔄 GitHubClient: Loaded \(cachedOrgs.count) organizations from cache")
+            completion(.success(cachedOrgs))
+            return
+        }
+        
+        print("🔄 GitHubClient: Cache miss, fetching organizations from API")
+        
         guard let accessToken = GitHubOAuthConfig.accessToken else {
             completion(.failure(.noAccessToken))
             return
@@ -106,7 +136,15 @@ public class GitHubClient {
         
         let task = session.dataTask(with: request) { [weak self] data, response, error in
             print("🔧 GitHubClient: User organizations response received")
-            self?.handleOrganizationsResponse(data: data, response: response, error: error, completion: completion)
+            self?.handleOrganizationsResponse(data: data, response: response, error: error) { result in
+                switch result {
+                case .success(let organizations):
+                    self?.saveOrganizationsToCache(organizations: organizations, key: cacheKey)
+                    completion(.success(organizations))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
         }
         
         print("🔧 GitHubClient: Starting user organizations request task")
@@ -115,7 +153,25 @@ public class GitHubClient {
     }
     
     public func getOrganizationRepositories(org: String, completion: @escaping (Result<[Repository], GitHubError>) -> Void) {
-        fetchAllRepositories(url: "\(baseURL)/orgs/\(org)/repos", completion: completion)
+        let cacheKey = "CachedOrgRepositories_\(org)"
+        
+        // Try to load from cache first
+        if let cachedRepos = loadRepositoriesFromCache(key: cacheKey) {
+            print("🔄 GitHubClient: Loaded \(cachedRepos.count) repositories for org \(org) from cache")
+            completion(.success(cachedRepos))
+            return
+        }
+        
+        print("🔄 GitHubClient: Cache miss, fetching repositories for org \(org) from API")
+        fetchAllRepositories(url: "\(baseURL)/orgs/\(org)/repos") { [weak self] result in
+            switch result {
+            case .success(let repositories):
+                self?.saveRepositoriesToCache(repositories: repositories, key: cacheKey)
+                completion(.success(repositories))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
     }
     
     public func getRepository(owner: String, repo: String, completion: @escaping (Result<Repository, GitHubError>) -> Void) {
@@ -720,5 +776,95 @@ public class GitHubClient {
     
     public func clearAuthentication() {
         GitHubOAuthConfig.clearCredentials()
+        clearAllCaches()
+    }
+    
+    // MARK: - Cache Management
+    
+    private func loadRepositoriesFromCache(key: String) -> [Repository]? {
+        guard let data = userDefaults.data(forKey: key) else {
+            return nil
+        }
+        
+        do {
+            let cachedData = try JSONDecoder().decode(CachedRepositoryData.self, from: data)
+            
+            if cachedData.isExpired {
+                userDefaults.removeObject(forKey: key)
+                return nil
+            }
+            
+            return cachedData.repositories
+        } catch {
+            print("⚠️ GitHubClient: Failed to load repository cache for key \(key): \(error)")
+            userDefaults.removeObject(forKey: key)
+            return nil
+        }
+    }
+    
+    private func saveRepositoriesToCache(repositories: [Repository], key: String) {
+        let cachedData = CachedRepositoryData(repositories: repositories)
+        
+        do {
+            let data = try JSONEncoder().encode(cachedData)
+            userDefaults.set(data, forKey: key)
+            print("🔄 GitHubClient: Saved \(repositories.count) repositories to cache with key \(key)")
+        } catch {
+            print("⚠️ GitHubClient: Failed to save repository cache for key \(key): \(error)")
+        }
+    }
+    
+    private func loadOrganizationsFromCache(key: String) -> [Organization]? {
+        guard let data = userDefaults.data(forKey: key) else {
+            return nil
+        }
+        
+        do {
+            let cachedData = try JSONDecoder().decode(CachedOrganizationData.self, from: data)
+            
+            if cachedData.isExpired {
+                userDefaults.removeObject(forKey: key)
+                return nil
+            }
+            
+            return cachedData.organizations
+        } catch {
+            print("⚠️ GitHubClient: Failed to load organization cache for key \(key): \(error)")
+            userDefaults.removeObject(forKey: key)
+            return nil
+        }
+    }
+    
+    private func saveOrganizationsToCache(organizations: [Organization], key: String) {
+        let cachedData = CachedOrganizationData(organizations: organizations)
+        
+        do {
+            let data = try JSONEncoder().encode(cachedData)
+            userDefaults.set(data, forKey: key)
+            print("🔄 GitHubClient: Saved \(organizations.count) organizations to cache with key \(key)")
+        } catch {
+            print("⚠️ GitHubClient: Failed to save organization cache for key \(key): \(error)")
+        }
+    }
+    
+    public func clearAllCaches() {
+        let keysToRemove = [
+            "CachedPersonalRepositories",
+            "CachedUserOrganizations"
+        ]
+        
+        for key in keysToRemove {
+            userDefaults.removeObject(forKey: key)
+        }
+        
+        // Clear organization-specific repository caches
+        let allKeys = Array(userDefaults.dictionaryRepresentation().keys)
+        for key in allKeys {
+            if key.hasPrefix("CachedOrgRepositories_") {
+                userDefaults.removeObject(forKey: key)
+            }
+        }
+        
+        print("🔄 GitHubClient: Cleared all repository and organization caches")
     }
 }

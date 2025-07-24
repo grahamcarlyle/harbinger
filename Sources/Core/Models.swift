@@ -352,6 +352,56 @@ struct GitHubAPIErrorDetail: Codable {
     let message: String?
 }
 
+// MARK: - Cache Models
+
+public struct CachedRepositoryData: Codable {
+    let repositories: [Repository]
+    let cachedAt: Date
+    let expiresAt: Date
+    
+    init(repositories: [Repository], cacheDuration: TimeInterval = 3600) { // 1 hour default
+        self.repositories = repositories
+        self.cachedAt = Date()
+        self.expiresAt = Date().addingTimeInterval(cacheDuration)
+    }
+    
+    var isExpired: Bool {
+        return Date() > expiresAt
+    }
+}
+
+public struct CachedWorkflowData: Codable {
+    let workflowStatus: [String: Bool] // repository fullName -> hasWorkflows
+    let cachedAt: Date
+    let expiresAt: Date
+    
+    init(workflowStatus: [String: Bool], cacheDuration: TimeInterval = 86400) { // 24 hours default
+        self.workflowStatus = workflowStatus
+        self.cachedAt = Date()
+        self.expiresAt = Date().addingTimeInterval(cacheDuration)
+    }
+    
+    var isExpired: Bool {
+        return Date() > expiresAt
+    }
+}
+
+public struct CachedOrganizationData: Codable {
+    let organizations: [Organization]
+    let cachedAt: Date
+    let expiresAt: Date
+    
+    init(organizations: [Organization], cacheDuration: TimeInterval = 3600) { // 1 hour default
+        self.organizations = organizations
+        self.cachedAt = Date()
+        self.expiresAt = Date().addingTimeInterval(cacheDuration)
+    }
+    
+    var isExpired: Bool {
+        return Date() > expiresAt
+    }
+}
+
 // MARK: - Additional GitHub Models
 
 public struct GitHubUser: Codable {

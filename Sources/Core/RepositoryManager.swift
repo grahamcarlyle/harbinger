@@ -8,13 +8,17 @@ public struct MonitoredRepository: Codable, Equatable {
     public let fullName: String
     public let isPrivate: Bool
     public let url: String
+    public var trackedWorkflows: [String: Bool] // workflow name -> enabled
+    public let addedAt: Date
     
-    public init(owner: String, name: String, fullName: String, isPrivate: Bool, url: String) {
+    public init(owner: String, name: String, fullName: String, isPrivate: Bool, url: String, trackedWorkflows: [String: Bool] = [:]) {
         self.owner = owner
         self.name = name
         self.fullName = fullName
         self.isPrivate = isPrivate
         self.url = url
+        self.trackedWorkflows = trackedWorkflows
+        self.addedAt = Date()
     }
     
     // Convenience initializer from GitHub Repository model
@@ -24,10 +28,35 @@ public struct MonitoredRepository: Codable, Equatable {
         self.fullName = repository.fullName
         self.isPrivate = repository.private
         self.url = repository.htmlUrl
+        self.trackedWorkflows = [:] // Start with no specific workflows tracked
+        self.addedAt = Date()
     }
     
     public var displayName: String {
         return fullName
+    }
+    
+    // Workflow tracking management
+    public func isWorkflowTracked(_ workflowName: String) -> Bool {
+        // If no specific workflows are configured, track all workflows (default behavior)
+        if trackedWorkflows.isEmpty {
+            return true
+        }
+        return trackedWorkflows[workflowName] ?? false
+    }
+    
+    public var hasSpecificWorkflowsConfigured: Bool {
+        return !trackedWorkflows.isEmpty
+    }
+    
+    public var trackedWorkflowNames: [String] {
+        return trackedWorkflows.compactMap { name, enabled in
+            enabled ? name : nil
+        }.sorted()
+    }
+    
+    public var allConfiguredWorkflowNames: [String] {
+        return Array(trackedWorkflows.keys).sorted()
     }
 }
 
@@ -88,6 +117,42 @@ public class RepositoryManager {
     
     public func isRepositoryMonitored(fullName: String) -> Bool {
         return getMonitoredRepositories().contains { $0.fullName == fullName }
+    }
+    
+    // MARK: - Workflow Tracking Management
+    
+    public func updateWorkflowTracking(for repositoryFullName: String, workflowName: String, enabled: Bool) -> Bool {
+        var repositories = getMonitoredRepositories()
+        
+        guard let index = repositories.firstIndex(where: { $0.fullName == repositoryFullName }) else {
+            print("❌ RepositoryManager: Repository \(repositoryFullName) not found for workflow update")
+            return false
+        }
+        
+        // Create a new instance with updated workflow tracking since struct is immutable
+        var updatedRepo = repositories[index]
+        updatedRepo.trackedWorkflows[workflowName] = enabled
+        repositories[index] = updatedRepo
+        return saveRepositories(repositories)
+    }
+    
+    public func setTrackedWorkflows(for repositoryFullName: String, workflows: [String: Bool]) -> Bool {
+        var repositories = getMonitoredRepositories()
+        
+        guard let index = repositories.firstIndex(where: { $0.fullName == repositoryFullName }) else {
+            print("❌ RepositoryManager: Repository \(repositoryFullName) not found for workflow update")
+            return false
+        }
+        
+        // Create a new instance with updated workflow tracking since struct is immutable
+        var updatedRepo = repositories[index]
+        updatedRepo.trackedWorkflows = workflows
+        repositories[index] = updatedRepo
+        return saveRepositories(repositories)
+    }
+    
+    public func getMonitoredRepository(fullName: String) -> MonitoredRepository? {
+        return getMonitoredRepositories().first { $0.fullName == fullName }
     }
     
     private func saveRepositories(_ repositories: [MonitoredRepository]) -> Bool {

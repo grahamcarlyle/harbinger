@@ -7,7 +7,11 @@ public class WorkflowDetectionService {
     
     private let gitHubClient = GitHubClient()
     
-    // Cache for workflow detection results (repository fullName -> hasWorkflows)
+    // Persistent cache management
+    private let userDefaults = UserDefaults.standard
+    private let cacheKey = "WorkflowDetectionCache"
+    
+    // In-memory cache for quick access (loaded from persistent cache)
     private var workflowCache: [String: Bool] = [:]
     
     // Track ongoing requests to avoid duplicate API calls
@@ -19,7 +23,9 @@ public class WorkflowDetectionService {
     // Timer for batching requests to avoid overwhelming the API
     private var batchTimer: Timer?
     
-    private init() {}
+    private init() {
+        loadCacheFromPersistentStorage()
+    }
     
     // Check if a repository has workflows (with batching and caching)
     public func hasWorkflows(repository: Repository, completion: @escaping (Bool) -> Void) {
@@ -34,6 +40,7 @@ public class WorkflowDetectionService {
         // Skip obviously non-viable repositories
         if !repository.isBasicallyViable {
             workflowCache[cacheKey] = false
+            saveCacheToPersistentStorage()
             completion(false)
             return
         }
@@ -91,12 +98,14 @@ public class WorkflowDetectionService {
                 case .success(let workflowResponse):
                     let hasWorkflows = !workflowResponse.workflows.isEmpty
                     self?.workflowCache[cacheKey] = hasWorkflows
+                    self?.saveCacheToPersistentStorage()
                     completion(hasWorkflows)
                     
                 case .failure(let error):
                     // On error, assume repository has no workflows to be conservative
                     print("⚠️ WorkflowDetectionService: Failed to check workflows for \(cacheKey): \(error)")
                     self?.workflowCache[cacheKey] = false  // Conservative approach on error
+                    self?.saveCacheToPersistentStorage()
                     completion(false)
                 }
             }
@@ -112,10 +121,49 @@ public class WorkflowDetectionService {
     public func clearCache() {
         workflowCache.removeAll()
         ongoingRequests.removeAll()
+        userDefaults.removeObject(forKey: cacheKey)
     }
     
     // Pre-populate cache with known results (for testing)
     public func setCachedResult(repository: String, hasWorkflows: Bool) {
         workflowCache[repository] = hasWorkflows
+        saveCacheToPersistentStorage()
+    }
+    
+    // MARK: - Persistent Cache Management
+    
+    private func loadCacheFromPersistentStorage() {
+        guard let data = userDefaults.data(forKey: cacheKey) else {
+            print("🔄 WorkflowDetectionService: No persistent cache found")
+            return
+        }
+        
+        do {
+            let cachedData = try JSONDecoder().decode(CachedWorkflowData.self, from: data)
+            
+            if cachedData.isExpired {
+                print("🔄 WorkflowDetectionService: Persistent cache expired, clearing")
+                userDefaults.removeObject(forKey: cacheKey)
+                return
+            }
+            
+            workflowCache = cachedData.workflowStatus
+            print("🔄 WorkflowDetectionService: Loaded \(workflowCache.count) items from persistent cache")
+        } catch {
+            print("⚠️ WorkflowDetectionService: Failed to load persistent cache: \(error)")
+            userDefaults.removeObject(forKey: cacheKey)
+        }
+    }
+    
+    private func saveCacheToPersistentStorage() {
+        let cachedData = CachedWorkflowData(workflowStatus: workflowCache)
+        
+        do {
+            let data = try JSONEncoder().encode(cachedData)
+            userDefaults.set(data, forKey: cacheKey)
+            print("🔄 WorkflowDetectionService: Saved \(workflowCache.count) items to persistent cache")
+        } catch {
+            print("⚠️ WorkflowDetectionService: Failed to save persistent cache: \(error)")
+        }
     }
 }

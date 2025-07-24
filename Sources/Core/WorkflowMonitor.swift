@@ -205,8 +205,25 @@ public class WorkflowMonitor {
             case .success(let workflowRuns):
                 print("✅ WorkflowMonitor: Fetched \(workflowRuns.workflowRuns.count) workflow runs for \(repository.fullName)")
                 
+                // Filter workflow runs based on repository's tracking configuration
+                let filteredRuns = workflowRuns.workflowRuns.filter { workflowRun in
+                    // If no specific workflows are configured, track all workflows (default behavior)
+                    guard repository.hasSpecificWorkflowsConfigured else {
+                        return true
+                    }
+                    
+                    // Only include workflows that are explicitly tracked
+                    let workflowName = workflowRun.name ?? "Unknown Workflow"
+                    return repository.isWorkflowTracked(workflowName)
+                }
+                
+                print("🔍 WorkflowMonitor: Filtered to \(filteredRuns.count) tracked workflow runs for \(repository.fullName)")
+                if repository.hasSpecificWorkflowsConfigured {
+                    print("🔍 WorkflowMonitor: Tracking specific workflows: \(repository.trackedWorkflowNames)")
+                }
+                
                 // Get latest workflow runs (limit to recent ones)
-                let recentRuns = Array(workflowRuns.workflowRuns.prefix(10))
+                let recentRuns = Array(filteredRuns.prefix(10))
                 let workflowSummaries = recentRuns.map { WorkflowRunSummary(from: $0) }
                 
                 let status = RepositoryWorkflowStatus(

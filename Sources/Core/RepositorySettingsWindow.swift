@@ -9,6 +9,7 @@ public class RepositorySettingsWindow: NSWindowController {
     // Main UI Elements
     private var tabView: NSTabView!
     private var refreshButton: NSButton!
+    private var clearCacheButton: NSButton!
     private var closeButton: NSButton!
     private var loadingIndicator: NSProgressIndicator!
     
@@ -34,6 +35,10 @@ public class RepositorySettingsWindow: NSWindowController {
     
     // Monitored Repositories Tab
     private var monitoredTableView: NSTableView!
+    private var workflowTableView: NSTableView!
+    private var workflowTableLabel: NSTextField!
+    private var selectedRepository: MonitoredRepository?
+    private var currentWorkflows: [Workflow] = []
     
     // Common elements across tabs
     private var tabAddButtons: [NSButton] = []
@@ -41,13 +46,13 @@ public class RepositorySettingsWindow: NSWindowController {
     
     public init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 800),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
         
-        window.minSize = NSSize(width: 800, height: 600)
+        window.minSize = NSSize(width: 800, height: 700)
         
         super.init(window: window)
         
@@ -98,10 +103,12 @@ public class RepositorySettingsWindow: NSWindowController {
         buttonStack.spacing = 12
         
         refreshButton = NSButton(title: "Refresh Current Tab", target: self, action: #selector(refreshCurrentTab))
+        clearCacheButton = NSButton(title: "Clear Cache", target: self, action: #selector(clearAllCaches))
         closeButton = NSButton(title: "Close", target: self, action: #selector(closeWindow))
         
         buttonStack.addArrangedSubview(NSView()) // Spacer
         buttonStack.addArrangedSubview(refreshButton)
+        buttonStack.addArrangedSubview(clearCacheButton)
         buttonStack.addArrangedSubview(closeButton)
         
         mainStack.addArrangedSubview(buttonStack)
@@ -133,6 +140,8 @@ public class RepositorySettingsWindow: NSWindowController {
         searchResultsTable.dataSource = self
         monitoredTableView.delegate = self
         monitoredTableView.dataSource = self
+        workflowTableView.delegate = self
+        workflowTableView.dataSource = self
     }
     
     // MARK: - Tab Setup Methods
@@ -190,10 +199,17 @@ public class RepositorySettingsWindow: NSWindowController {
         // Add columns with better width distribution
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameColumn.title = "Repository"
-        nameColumn.width = 400
-        nameColumn.minWidth = 200
+        nameColumn.width = 250
+        nameColumn.minWidth = 150
         nameColumn.resizingMask = .autoresizingMask
         personalTableView.addTableColumn(nameColumn)
+        
+        let descriptionColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("description"))
+        descriptionColumn.title = "Description"
+        descriptionColumn.width = 250
+        descriptionColumn.minWidth = 150
+        descriptionColumn.resizingMask = .autoresizingMask
+        personalTableView.addTableColumn(descriptionColumn)
         
         let visibilityColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("visibility"))
         visibilityColumn.title = "Visibility"
@@ -313,10 +329,17 @@ public class RepositorySettingsWindow: NSWindowController {
         // Add columns with better width distribution
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameColumn.title = "Repository"
-        nameColumn.width = 400
-        nameColumn.minWidth = 200
+        nameColumn.width = 250
+        nameColumn.minWidth = 150
         nameColumn.resizingMask = .autoresizingMask
         orgTableView.addTableColumn(nameColumn)
+        
+        let descriptionColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("description"))
+        descriptionColumn.title = "Description"
+        descriptionColumn.width = 250
+        descriptionColumn.minWidth = 150
+        descriptionColumn.resizingMask = .autoresizingMask
+        orgTableView.addTableColumn(descriptionColumn)
         
         let visibilityColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("visibility"))
         visibilityColumn.title = "Visibility"
@@ -539,24 +562,30 @@ public class RepositorySettingsWindow: NSWindowController {
         tabItem.label = "Monitored"
         
         let tabContent = NSView()
-        // ROBUST FIX: Force explicit content view sizing to prevent NSTabView layout bugs
-        tabContent.frame = NSRect(x: 0, y: 0, width: 1000, height: 600)
-        tabContent.autoresizingMask = [.width, .height]
-        // Use constraints instead of autoresizing mask for more predictable behavior
         tabContent.translatesAutoresizingMaskIntoConstraints = false
         
-        // Use stack view approach like the working Personal tab
+        // Main container stack view
         let mainStack = NSStackView()
         mainStack.orientation = .vertical
-        mainStack.spacing = 12
+        mainStack.spacing = 16
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         tabContent.addSubview(mainStack)
         
-        // Info label
-        let infoLabel = NSTextField(labelWithString: "Repositories currently being monitored for workflow status")
-        infoLabel.font = NSFont.systemFont(ofSize: 11)
-        infoLabel.textColor = .secondaryLabelColor
-        mainStack.addArrangedSubview(infoLabel)
+        // Top section: Monitored repositories
+        let topSection = NSStackView()
+        topSection.orientation = .vertical
+        topSection.spacing = 8
+        mainStack.addArrangedSubview(topSection)
+        
+        // Monitored repositories header
+        let repoHeaderLabel = NSTextField(labelWithString: "Monitored Repositories")
+        repoHeaderLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        topSection.addArrangedSubview(repoHeaderLabel)
+        
+        let repoInfoLabel = NSTextField(labelWithString: "Select a repository to configure its workflow tracking")
+        repoInfoLabel.font = NSFont.systemFont(ofSize: 11)
+        repoInfoLabel.textColor = .secondaryLabelColor
+        topSection.addArrangedSubview(repoInfoLabel)
         
         // Monitored repositories table
         monitoredTableView = NSTableView()
@@ -567,7 +596,7 @@ public class RepositorySettingsWindow: NSWindowController {
         monitoredTableView.allowsColumnReordering = false
         monitoredTableView.allowsColumnResizing = true
         
-        // Add columns with better width distribution
+        // Add columns
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameColumn.title = "Repository"
         nameColumn.width = 350
@@ -589,6 +618,13 @@ public class RepositorySettingsWindow: NSWindowController {
         statusColumn.resizingMask = .autoresizingMask
         monitoredTableView.addTableColumn(statusColumn)
         
+        let workflowsColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("workflows"))
+        workflowsColumn.title = "Workflows"
+        workflowsColumn.width = 150
+        workflowsColumn.minWidth = 100
+        workflowsColumn.resizingMask = .autoresizingMask
+        monitoredTableView.addTableColumn(workflowsColumn)
+        
         let addedColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("added"))
         addedColumn.title = "Added"
         addedColumn.width = 120
@@ -596,56 +632,205 @@ public class RepositorySettingsWindow: NSWindowController {
         addedColumn.resizingMask = .autoresizingMask
         monitoredTableView.addTableColumn(addedColumn)
         
-        let scrollView = NSScrollView()
-        scrollView.documentView = monitoredTableView
-        scrollView.hasVerticalScroller = true
-        scrollView.borderType = .lineBorder
-        scrollView.autohidesScrollers = false
-        scrollView.hasHorizontalScroller = true
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        let repoScrollView = NSScrollView()
+        repoScrollView.documentView = monitoredTableView
+        repoScrollView.hasVerticalScroller = true
+        repoScrollView.borderType = .lineBorder
+        repoScrollView.autohidesScrollers = false
+        repoScrollView.hasHorizontalScroller = true
+        repoScrollView.translatesAutoresizingMaskIntoConstraints = false
+        topSection.addArrangedSubview(repoScrollView)
         
-        // Add scroll view directly to tab content with explicit constraints instead of stack view
-        tabContent.addSubview(scrollView)
+        // Repository action buttons
+        let repoButtonStack = NSStackView()
+        repoButtonStack.orientation = .horizontal
+        repoButtonStack.spacing = 12
+        topSection.addArrangedSubview(repoButtonStack)
         
-        // Force the table to size its columns to fill available width
-        monitoredTableView.sizeLastColumnToFit()
-        
-        // Remove button - use dedicated instance property to prevent external conflicts
         monitoredRemoveButton = NSButton(title: "Remove Selected Repository", target: self, action: #selector(removeRepository))
         monitoredRemoveButton.isEnabled = false
-        monitoredRemoveButton.translatesAutoresizingMaskIntoConstraints = false
-        tabContent.addSubview(monitoredRemoveButton)
         
-        // CRITICAL FIX: Activate all constraints in single call to avoid ambiguous layout
+        repoButtonStack.addArrangedSubview(monitoredRemoveButton)
+        repoButtonStack.addArrangedSubview(NSView()) // Spacer
+        
+        // Bottom section: Workflow configuration
+        let bottomSection = NSStackView()
+        bottomSection.orientation = .vertical
+        bottomSection.spacing = 8
+        mainStack.addArrangedSubview(bottomSection)
+        
+        // Workflow configuration header
+        workflowTableLabel = NSTextField(labelWithString: "Workflow Configuration")
+        workflowTableLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        bottomSection.addArrangedSubview(workflowTableLabel)
+        
+        let workflowInfoLabel = NSTextField(labelWithString: "Configure which workflows to track for the selected repository")
+        workflowInfoLabel.font = NSFont.systemFont(ofSize: 11)
+        workflowInfoLabel.textColor = .secondaryLabelColor
+        bottomSection.addArrangedSubview(workflowInfoLabel)
+        
+        // Workflow table
+        workflowTableView = NSTableView()
+        workflowTableView.rowSizeStyle = .default
+        workflowTableView.selectionHighlightStyle = .none // No selection needed for workflow table
+        workflowTableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        workflowTableView.usesAlternatingRowBackgroundColors = true
+        workflowTableView.allowsColumnReordering = false
+        workflowTableView.allowsColumnResizing = true
+        workflowTableView.allowsEmptySelection = true
+        workflowTableView.allowsMultipleSelection = false
+        
+        // Workflow table columns
+        let workflowNameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("workflowName"))
+        workflowNameColumn.title = "Workflow Name"
+        workflowNameColumn.width = 300
+        workflowNameColumn.minWidth = 200
+        workflowNameColumn.resizingMask = .autoresizingMask
+        workflowTableView.addTableColumn(workflowNameColumn)
+        
+        let workflowStateColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("workflowState"))
+        workflowStateColumn.title = "State"
+        workflowStateColumn.width = 100
+        workflowStateColumn.minWidth = 80
+        workflowStateColumn.resizingMask = .autoresizingMask
+        workflowTableView.addTableColumn(workflowStateColumn)
+        
+        let workflowEnabledColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("workflowEnabled"))
+        workflowEnabledColumn.title = "Track"
+        workflowEnabledColumn.width = 80
+        workflowEnabledColumn.minWidth = 60
+        workflowEnabledColumn.resizingMask = .autoresizingMask
+        workflowTableView.addTableColumn(workflowEnabledColumn)
+        
+        let workflowScrollView = NSScrollView()
+        workflowScrollView.documentView = workflowTableView
+        workflowScrollView.hasVerticalScroller = true
+        workflowScrollView.borderType = .lineBorder
+        workflowScrollView.autohidesScrollers = false
+        workflowScrollView.hasHorizontalScroller = true
+        workflowScrollView.translatesAutoresizingMaskIntoConstraints = false
+        bottomSection.addArrangedSubview(workflowScrollView)
+        
+        // Setup constraints
         NSLayoutConstraint.activate([
             // Main stack positioning
             mainStack.topAnchor.constraint(equalTo: tabContent.topAnchor, constant: 16),
             mainStack.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
             mainStack.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            mainStack.bottomAnchor.constraint(equalTo: tabContent.bottomAnchor, constant: -16),
             
-            // Scroll view positioning (depends on main stack)
-            scrollView.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: 12),
-            scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
-            scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(equalToConstant: 400),
+            // Repository table height and width
+            repoScrollView.heightAnchor.constraint(equalToConstant: 250),
+            repoScrollView.widthAnchor.constraint(greaterThanOrEqualToConstant: 900),
             
-            // Button positioning (depends on scroll view)
-            monitoredRemoveButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
-            monitoredRemoveButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
-            monitoredRemoveButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+            // Workflow table height and width
+            workflowScrollView.heightAnchor.constraint(equalToConstant: 200),
+            workflowScrollView.widthAnchor.constraint(greaterThanOrEqualToConstant: 900)
         ])
         
-        // ROBUST FIX: Add explicit tab content constraints to prevent NSTabView sizing issues
         tabItem.view = tabContent
         tabView.addTabViewItem(tabItem)
         
-        // After adding to tab view, constrain the content view to maintain proper size
+        // Add width constraints to prevent narrow layout issues
         DispatchQueue.main.async { [weak self] in
             if let _ = self?.tabView.window {
                 tabContent.widthAnchor.constraint(greaterThanOrEqualToConstant: 950).isActive = true
-                tabContent.heightAnchor.constraint(greaterThanOrEqualToConstant: 500).isActive = true
+                tabContent.heightAnchor.constraint(greaterThanOrEqualToConstant: 600).isActive = true
             }
         }
+        
+        // Initially disable workflow section until a repository is selected
+        updateWorkflowTableState()
+    }
+    
+    // MARK: - Workflow Table Management
+    
+    private func updateWorkflowTableState() {
+        let hasSelection = selectedRepository != nil
+        workflowTableView.isEnabled = hasSelection
+        
+        if hasSelection {
+            workflowTableLabel.stringValue = "Workflow Configuration - \(selectedRepository?.fullName ?? "")"
+            workflowTableLabel.textColor = .labelColor
+        } else {
+            workflowTableLabel.stringValue = "Workflow Configuration - Select a repository"
+            workflowTableLabel.textColor = .secondaryLabelColor
+        }
+    }
+    
+    private func loadWorkflowsForSelectedRepository() {
+        guard let repository = selectedRepository else {
+            currentWorkflows = []
+            workflowTableView.reloadData()
+            return
+        }
+        
+        print("🔧 Loading workflows for repository: \(repository.fullName)")
+        
+        // Fetch workflows from GitHub API
+        gitHubClient.getWorkflows(owner: repository.owner, repo: repository.name) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let workflows):
+                    let activeWorkflows = workflows.workflows.filter { $0.state == "active" }
+                    self?.currentWorkflows = activeWorkflows
+                    self?.workflowTableView.reloadData()
+                    print("✅ Loaded \(workflows.workflows.count) total workflows for \(repository.fullName)")
+                    print("✅ Filtered to \(activeWorkflows.count) active workflows: \(activeWorkflows.map { $0.name })")
+                    
+                case .failure(let error):
+                    print("❌ Failed to load workflows for \(repository.fullName): \(error)")
+                    self?.currentWorkflows = []
+                    self?.workflowTableView.reloadData()
+                }
+            }
+        }
+    }
+    
+    private func toggleWorkflowTracking(for workflowName: String) {
+        guard let repository = selectedRepository else { 
+            print("❌ No repository selected for workflow toggle")
+            return 
+        }
+        
+        print("🔄 Toggling workflow '\(workflowName)' for repository '\(repository.fullName)'")
+        
+        // Update the repository's workflow tracking
+        var updatedRepository = repository
+        let currentlyTracked = repository.isWorkflowTracked(workflowName)
+        print("🔄 Current tracking state for '\(workflowName)': \(currentlyTracked)")
+        
+        // Initialize trackedWorkflows if empty (first configuration)
+        if updatedRepository.trackedWorkflows.isEmpty {
+            print("🔄 Initializing workflow tracking (was empty)")
+            // Set all current workflows to their default state (true)
+            for workflow in currentWorkflows {
+                updatedRepository.trackedWorkflows[workflow.name] = true
+            }
+        }
+        
+        // Toggle the specific workflow
+        updatedRepository.trackedWorkflows[workflowName] = !currentlyTracked
+        print("🔄 New tracking state for '\(workflowName)': \(!currentlyTracked)")
+        
+        // Save the updated repository
+        let success = repositoryManager.setTrackedWorkflows(for: repository.fullName, workflows: updatedRepository.trackedWorkflows)
+        guard success else {
+            print("❌ Failed to save workflow configuration for \(repository.fullName)")
+            return
+        }
+        
+        // Update the monitored repositories list
+        if let index = monitoredRepositories.firstIndex(where: { $0.fullName == repository.fullName }) {
+            monitoredRepositories[index] = updatedRepository
+            selectedRepository = updatedRepository
+        }
+        
+        // Reload both tables
+        monitoredTableView.reloadData()
+        workflowTableView.reloadData()
+        
+        print("🔄 Toggled workflow '\(workflowName)' tracking: \(!currentlyTracked) for \(repository.fullName)")
     }
     
     // MARK: - Data Loading Methods
@@ -751,6 +936,7 @@ public class RepositorySettingsWindow: NSWindowController {
             loadingIndicator?.stopAnimation(nil)
         }
         refreshButton?.isEnabled = !show
+        clearCacheButton?.isEnabled = !show
     }
     
     private func showAuthenticationInfo() {
@@ -889,6 +1075,7 @@ public class RepositorySettingsWindow: NSWindowController {
     }
     
     // Monitored Repositories Tab Actions
+    
     @objc private func removeRepository() {
         let selectedRow = monitoredTableView.selectedRow
         guard selectedRow >= 0 && selectedRow < monitoredRepositories.count else { return }
@@ -899,9 +1086,13 @@ public class RepositorySettingsWindow: NSWindowController {
             monitoredRepositories = repositoryManager.getMonitoredRepositories()
             monitoredTableView.reloadData()
             
-            // Clear selection and update button state
+            // Clear selection and update state
             monitoredTableView.deselectAll(nil)
+            selectedRepository = nil
             monitoredRemoveButton.isEnabled = false
+            updateWorkflowTableState()
+            currentWorkflows = []
+            workflowTableView.reloadData()
             
             StatusBarDebugger.shared.log(.menu, "Repository removed from monitoring", context: ["repo": repository.fullName])
         }
@@ -937,6 +1128,35 @@ public class RepositorySettingsWindow: NSWindowController {
             break
         default:
             break
+        }
+    }
+    
+    @objc private func clearAllCaches() {
+        StatusBarDebugger.shared.log(.menu, "Clear cache button clicked")
+        
+        // Show confirmation dialog
+        let alert = NSAlert()
+        alert.messageText = "Clear All Cached Data"
+        alert.informativeText = "This will clear all cached repository data and workflow status. The next time you open repository tabs, fresh data will be fetched from GitHub. Continue?"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Clear Cache")
+        alert.addButton(withTitle: "Cancel")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // Clear all caches
+            gitHubClient.clearAllCaches()
+            WorkflowDetectionService.shared.clearCache()
+            
+            // Show success message
+            let successAlert = NSAlert()
+            successAlert.messageText = "Cache Cleared"
+            successAlert.informativeText = "All cached data has been cleared successfully. Repository data will be refreshed from GitHub on next load."
+            successAlert.alertStyle = .informational
+            successAlert.addButton(withTitle: "OK")
+            successAlert.runModal()
+            
+            StatusBarDebugger.shared.log(.menu, "All caches cleared successfully")
         }
     }
     
@@ -1045,7 +1265,8 @@ public class RepositorySettingsWindow: NSWindowController {
         case "searchtest":
             tabAddButtons[2].isEnabled = searchResultsTable.selectedRow >= 0
         case "monitored":
-            monitoredRemoveButton.isEnabled = monitoredTableView.selectedRow >= 0
+            let hasSelection = monitoredTableView.selectedRow >= 0
+            monitoredRemoveButton.isEnabled = hasSelection
         default:
             break
         }
@@ -1142,6 +1363,8 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             return searchResults.count
         } else if tableView == monitoredTableView {
             return monitoredRepositories.count
+        } else if tableView == workflowTableView {
+            return currentWorkflows.count
         }
         return 0
     }
@@ -1181,6 +1404,12 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             let repository = monitoredRepositories[row]
             
             configureMonitoredCell(textField: textField, repository: repository, identifier: identifier.rawValue)
+            
+        } else if tableView == workflowTableView {
+            guard row < currentWorkflows.count else { return nil }
+            let workflow = currentWorkflows[row]
+            
+            return configureWorkflowCell(workflow: workflow, identifier: identifier.rawValue, row: row)
         }
         
         cellView.addSubview(textField)
@@ -1258,6 +1487,26 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             textField.stringValue = repository.language ?? "—"
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = secondaryTextColor
+        case "description":
+            var descriptionText = repository.description ?? "No description"
+            
+            // Add indicators for different states like in search results
+            if isPending {
+                descriptionText = "[Detecting workflows] " + descriptionText
+            } else if !isViable {
+                if repository.archived == true {
+                    descriptionText = "[Archived] " + descriptionText
+                } else if repository.disabled == true {
+                    descriptionText = "[Disabled] " + descriptionText
+                } else {
+                    descriptionText = "[No workflows] " + descriptionText
+                }
+            }
+            
+            textField.stringValue = descriptionText
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = repository.description != nil ? baseTextColor : secondaryTextColor
+            textField.lineBreakMode = .byTruncatingTail
         case "updated":
             textField.stringValue = "Recently" // We don't have updated date, placeholder
             textField.font = NSFont.systemFont(ofSize: 11)
@@ -1375,8 +1624,23 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             textField.stringValue = "Monitoring" // Placeholder - could show actual status
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = .systemGreen
+        case "workflows":
+            if repository.hasSpecificWorkflowsConfigured {
+                let trackedCount = repository.trackedWorkflowNames.count
+                let totalCount = repository.allConfiguredWorkflowNames.count
+                textField.stringValue = "\(trackedCount)/\(totalCount) configured"
+                textField.font = NSFont.systemFont(ofSize: 11)
+                textField.textColor = trackedCount > 0 ? .systemBlue : .secondaryLabelColor
+            } else {
+                textField.stringValue = "All workflows"
+                textField.font = NSFont.systemFont(ofSize: 11)
+                textField.textColor = .secondaryLabelColor
+            }
         case "added":
-            textField.stringValue = "Recently" // Placeholder - could show actual date
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .none
+            textField.stringValue = formatter.string(from: repository.addedAt)
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = .secondaryLabelColor
         default:
@@ -1384,7 +1648,99 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
         }
     }
     
+    private func configureWorkflowCell(workflow: Workflow, identifier: String, row: Int) -> NSView? {
+        guard let repository = selectedRepository else { return nil }
+        
+        let cellView = NSTableCellView()
+        
+        switch identifier {
+        case "workflowName":
+            let textField = NSTextField()
+            textField.isBordered = false
+            textField.isEditable = false
+            textField.backgroundColor = .clear
+            textField.stringValue = workflow.name
+            textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            
+            cellView.addSubview(textField)
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
+                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
+                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+            ])
+            
+        case "workflowState":
+            let textField = NSTextField()
+            textField.isBordered = false
+            textField.isEditable = false
+            textField.backgroundColor = .clear
+            textField.stringValue = workflow.state.capitalized
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = workflow.state == "active" ? .systemGreen : .secondaryLabelColor
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            
+            cellView.addSubview(textField)
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
+                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
+                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+            ])
+            
+        case "workflowEnabled":
+            let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(workflowCheckboxToggled(_:)))
+            let isTracked = repository.isWorkflowTracked(workflow.name)
+            checkbox.state = isTracked ? .on : .off
+            checkbox.translatesAutoresizingMaskIntoConstraints = false
+            
+            // Store workflow name for the toggle action
+            checkbox.tag = row
+            
+            cellView.addSubview(checkbox)
+            NSLayoutConstraint.activate([
+                checkbox.centerXAnchor.constraint(equalTo: cellView.centerXAnchor),
+                checkbox.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+            ])
+            
+        default:
+            break
+        }
+        
+        return cellView
+    }
+    
+    @objc private func workflowCheckboxToggled(_ sender: NSButton) {
+        let row = sender.tag
+        print("🔄 Workflow checkbox toggled - row: \(row), currentWorkflows.count: \(currentWorkflows.count)")
+        
+        guard row >= 0 && row < currentWorkflows.count else { 
+            print("❌ Invalid row index: \(row) for \(currentWorkflows.count) workflows")
+            return 
+        }
+        
+        let workflow = currentWorkflows[row]
+        print("🔄 Toggling workflow: \(workflow.name)")
+        toggleWorkflowTracking(for: workflow.name)
+    }
+    
     public func tableViewSelectionDidChange(_ notification: Notification) {
+        if let tableView = notification.object as? NSTableView {
+            if tableView == monitoredTableView {
+                let selectedRow = tableView.selectedRow
+                if selectedRow >= 0 && selectedRow < monitoredRepositories.count {
+                    selectedRepository = monitoredRepositories[selectedRow]
+                    monitoredRemoveButton.isEnabled = true
+                    updateWorkflowTableState()
+                    loadWorkflowsForSelectedRepository()
+                } else {
+                    selectedRepository = nil
+                    monitoredRemoveButton.isEnabled = false
+                    updateWorkflowTableState()
+                    currentWorkflows = []
+                    workflowTableView.reloadData()
+                }
+            }
+        }
         updateTabButtonStates()
     }
 }
@@ -1448,4 +1804,7 @@ extension RepositorySettingsWindow: NSTabViewDelegate {
         }
     }
     #endif
+    
+    // MARK: - Workflow Configuration
+    
 }
