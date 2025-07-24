@@ -15,12 +15,14 @@ public struct Repository: Codable {
     let language: String?           // Primary language for search results
     let stargazersCount: Int?       // Star count for search results
     
+    // Fields for determining workflow monitoring viability
+    let fork: Bool?                 // Forks may not have meaningful workflows
+    let archived: Bool?             // Archived repos can't have new workflow runs
+    let disabled: Bool?             // Disabled repos can't run workflows
+    
     // Commented out unused fields to make decoding more robust
     // let id: Int
-    // let fork: Bool
-    // let archived: Bool
-    // let disabled: Bool
-    // let hasActions: Bool?
+    // let hasActions: Bool?  // Not reliably available in all API responses
     // let defaultBranch: String
     // let updatedAt: String
     
@@ -33,6 +35,60 @@ public struct Repository: Codable {
     
     public var displayName: String {
         return fullName
+    }
+    
+    // Basic viability check (archived/disabled) - fast check without API calls
+    public var isBasicallyViable: Bool {
+        // Skip archived repositories - they can't run new workflows
+        if archived == true {
+            return false
+        }
+        
+        // Skip disabled repositories - they can't run workflows
+        if disabled == true {
+            return false
+        }
+        
+        return true
+    }
+    
+    // Check if repository is viable for workflow monitoring
+    // This is a synchronous check that uses cached workflow data if available
+    public var isWorkflowMonitoringViable: Bool {
+        // First check basic viability (archived/disabled)
+        if !isBasicallyViable {
+            return false
+        }
+        
+        // Check cached workflow status
+        if let hasWorkflows = WorkflowDetectionService.shared.getCachedWorkflowStatus(for: self) {
+            return hasWorkflows
+        }
+        
+        // If no cached data, assume NOT viable until we know for sure
+        // This prevents adding repositories that might not have workflows
+        return false
+    }
+    
+    // Check if we're still determining workflow status
+    public var isWorkflowStatusPending: Bool {
+        // If basically not viable, no need to check workflows
+        if !isBasicallyViable {
+            return false
+        }
+        
+        // If we have cached data, we're not pending
+        if WorkflowDetectionService.shared.getCachedWorkflowStatus(for: self) != nil {
+            return false
+        }
+        
+        // If we're basically viable but don't have cached workflow status, we're pending
+        return true
+    }
+    
+    // Async method to check workflows and update UI callback
+    public func checkWorkflowViability(completion: @escaping (Bool) -> Void) {
+        WorkflowDetectionService.shared.hasWorkflows(repository: self, completion: completion)
     }
     
     // Removed isActive since archived/disabled fields are commented out

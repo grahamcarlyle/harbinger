@@ -1001,6 +1001,29 @@ public class RepositorySettingsWindow: NSWindowController {
         }
     }
     
+    // Helper method to reload a specific repository row after workflow detection
+    private func reloadRepositoryRow(repository: Repository) {
+        // Find which table contains this repository and reload the appropriate row
+        
+        // Check personal repositories
+        if let personalIndex = filteredPersonalRepositories().firstIndex(where: { $0.fullName == repository.fullName }) {
+            personalTableView.reloadData(forRowIndexes: IndexSet(integer: personalIndex), columnIndexes: IndexSet(0..<personalTableView.numberOfColumns))
+            return
+        }
+        
+        // Check organization repositories  
+        if let orgIndex = filteredOrgRepositories().firstIndex(where: { $0.fullName == repository.fullName }) {
+            orgTableView.reloadData(forRowIndexes: IndexSet(integer: orgIndex), columnIndexes: IndexSet(0..<orgTableView.numberOfColumns))
+            return
+        }
+        
+        // Check search results
+        if let searchIndex = searchResults.firstIndex(where: { $0.fullName == repository.fullName }) {
+            searchResultsTable.reloadData(forRowIndexes: IndexSet(integer: searchIndex), columnIndexes: IndexSet(0..<searchResultsTable.numberOfColumns))
+            return
+        }
+    }
+    
 }
 
 // MARK: - NSTextFieldDelegate
@@ -1098,41 +1121,151 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
     }
     
     private func configureRepositoryCell(textField: NSTextField, repository: Repository, identifier: String) {
+        // Determine repository status for UI styling
+        let isViable = repository.isWorkflowMonitoringViable
+        let isPending = repository.isWorkflowStatusPending
+        
+        // Choose colors based on status
+        let baseTextColor: NSColor
+        let secondaryTextColor: NSColor
+        
+        if isPending {
+            // Pending workflow detection - use muted colors and show loading indication
+            baseTextColor = .systemBlue
+            secondaryTextColor = .systemBlue.withAlphaComponent(0.7)
+        } else if isViable {
+            // Repository is viable - normal colors
+            baseTextColor = .labelColor
+            secondaryTextColor = .secondaryLabelColor
+        } else {
+            // Repository is not viable - greyed out colors
+            baseTextColor = .tertiaryLabelColor
+            secondaryTextColor = .quaternaryLabelColor
+        }
+        
+        // Only trigger workflow detection for pending repositories (not for every cell render)
+        if isPending {
+            repository.checkWorkflowViability { [weak self] hasWorkflows in
+                DispatchQueue.main.async {
+                    // Reload the row to update appearance based on workflow detection
+                    self?.reloadRepositoryRow(repository: repository)
+                }
+            }
+        }
+        
         switch identifier {
         case "name":
-            textField.stringValue = repository.fullName
+            var nameText = repository.fullName
+            
+            // Add loading indicator for pending repositories
+            if isPending {
+                nameText += " (checking workflows...)"
+            }
+            
+            textField.stringValue = nameText
             textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            textField.textColor = baseTextColor
         case "visibility":
-            textField.stringValue = repository.private ? "Private" : "Public"
+            var visibilityText = repository.private ? "Private" : "Public"
+            
+            // Add indicators for different states
+            if isPending {
+                visibilityText += " (Detecting...)"
+            } else if !isViable {
+                if repository.archived == true {
+                    visibilityText += " (Archived)"
+                } else if repository.disabled == true {
+                    visibilityText += " (Disabled)"
+                } else {
+                    visibilityText += " (No workflows)"
+                }
+            }
+            
+            textField.stringValue = visibilityText
             textField.font = NSFont.systemFont(ofSize: 11)
-            textField.textColor = .secondaryLabelColor
+            textField.textColor = secondaryTextColor
         case "language":
             textField.stringValue = repository.language ?? "—"
             textField.font = NSFont.systemFont(ofSize: 11)
-            textField.textColor = .secondaryLabelColor
+            textField.textColor = secondaryTextColor
         case "updated":
             textField.stringValue = "Recently" // We don't have updated date, placeholder
             textField.font = NSFont.systemFont(ofSize: 11)
-            textField.textColor = .secondaryLabelColor
+            textField.textColor = secondaryTextColor
         default:
             break
         }
     }
     
     private func configureSearchResultCell(textField: NSTextField, repository: Repository, identifier: String) {
+        // Determine repository status for UI styling
+        let isViable = repository.isWorkflowMonitoringViable
+        let isPending = repository.isWorkflowStatusPending
+        
+        // Choose colors based on status
+        let baseTextColor: NSColor
+        let secondaryTextColor: NSColor
+        
+        if isPending {
+            // Pending workflow detection - use muted colors and show loading indication
+            baseTextColor = .systemBlue
+            secondaryTextColor = .systemBlue.withAlphaComponent(0.7)
+        } else if isViable {
+            // Repository is viable - normal colors
+            baseTextColor = .labelColor
+            secondaryTextColor = .secondaryLabelColor
+        } else {
+            // Repository is not viable - greyed out colors
+            baseTextColor = .tertiaryLabelColor
+            secondaryTextColor = .quaternaryLabelColor
+        }
+        
+        // Only trigger workflow detection for pending repositories
+        if isPending {
+            repository.checkWorkflowViability { [weak self] hasWorkflows in
+                DispatchQueue.main.async {
+                    // Reload the row to update appearance based on workflow detection
+                    self?.reloadRepositoryRow(repository: repository)
+                }
+            }
+        }
+        
         switch identifier {
         case "name":
-            textField.stringValue = repository.fullName
+            var nameText = repository.fullName
+            
+            // Add loading indicator for pending repositories
+            if isPending {
+                nameText += " (checking workflows...)"
+            }
+            
+            textField.stringValue = nameText
             textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            textField.textColor = baseTextColor
         case "description":
-            textField.stringValue = repository.description ?? "No description"
+            var descriptionText = repository.description ?? "No description"
+            
+            // Add indicators for different states
+            if isPending {
+                descriptionText = "[Detecting workflows] " + descriptionText
+            } else if !isViable {
+                if repository.archived == true {
+                    descriptionText = "[Archived] " + descriptionText
+                } else if repository.disabled == true {
+                    descriptionText = "[Disabled] " + descriptionText
+                } else {
+                    descriptionText = "[No workflows] " + descriptionText
+                }
+            }
+            
+            textField.stringValue = descriptionText
             textField.font = NSFont.systemFont(ofSize: 11)
-            textField.textColor = repository.description != nil ? .labelColor : .secondaryLabelColor
+            textField.textColor = repository.description != nil ? baseTextColor : secondaryTextColor
             textField.lineBreakMode = .byTruncatingTail
         case "language":
             textField.stringValue = repository.language ?? "—"
             textField.font = NSFont.systemFont(ofSize: 11)
-            textField.textColor = .secondaryLabelColor
+            textField.textColor = secondaryTextColor
         case "stars":
             if let stars = repository.stargazersCount {
                 textField.stringValue = stars >= 1000 ? String(format: "%.1fk", Double(stars) / 1000) : "\(stars)"
@@ -1140,7 +1273,7 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
                 textField.stringValue = "0"
             }
             textField.font = NSFont.systemFont(ofSize: 11)
-            textField.textColor = .secondaryLabelColor
+            textField.textColor = secondaryTextColor
             textField.alignment = .right
         default:
             break
