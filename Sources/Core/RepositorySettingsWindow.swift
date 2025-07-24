@@ -4,30 +4,50 @@ public class RepositorySettingsWindow: NSWindowController {
     
     private let repositoryManager = RepositoryManager()
     private let gitHubClient = GitHubClient()
-    private var availableRepositories: [Repository] = []
     private var monitoredRepositories: [MonitoredRepository] = []
     
-    // UI Elements
-    private var availableTableView: NSTableView!
-    private var monitoredTableView: NSTableView!
-    private var addButton: NSButton!
-    private var removeButton: NSButton!
+    // Main UI Elements
+    private var tabView: NSTabView!
     private var refreshButton: NSButton!
     private var closeButton: NSButton!
     private var loadingIndicator: NSProgressIndicator!
     
-    // Manual repository entry
-    private var repoEntryField: NSTextField!
-    private var addManualButton: NSButton!
-    private var repoSuggestions: [String] = []
+    // Personal Repositories Tab
+    private var personalRepositories: [Repository] = []
+    private var personalTableView: NSTableView!
+    private var personalFilterField: NSTextField!
+    private var personalSortButton: NSPopUpButton!
+    
+    // Organizations Tab
+    private var userOrganizations: [Organization] = []
+    private var selectedOrgRepositories: [Repository] = []
+    private var organizationsPopUp: NSPopUpButton!
+    private var orgTableView: NSTableView!
+    private var orgFilterField: NSTextField!
+    
+    // Public Search Tab
+    private var searchField: NSTextField!
+    private var searchResultsTable: NSTableView!
+    private var searchButton: NSButton!
+    private var searchResults: [Repository] = []
+    private var isSearching = false
+    
+    // Monitored Repositories Tab
+    private var monitoredTableView: NSTableView!
+    
+    // Common elements across tabs
+    private var tabAddButtons: [NSButton] = []
+    private var monitoredRemoveButton: NSButton!
     
     public init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
+        
+        window.minSize = NSSize(width: 800, height: 600)
         
         super.init(window: window)
         
@@ -60,41 +80,24 @@ public class RepositorySettingsWindow: NSWindowController {
         titleLabel.alignment = .center
         mainStack.addArrangedSubview(titleLabel)
         
-        // Manual repository entry section
-        let manualEntrySection = createManualEntrySection()
-        mainStack.addArrangedSubview(manualEntrySection)
+        // Create tabbed interface
+        tabView = NSTabView()
+        tabView.tabViewType = .topTabsBezelBorder
+        tabView.delegate = self
+        mainStack.addArrangedSubview(tabView)
         
-        // Content stack
-        let contentStack = NSStackView()
-        contentStack.orientation = .horizontal
-        contentStack.spacing = 16
-        contentStack.distribution = .fillEqually
-        mainStack.addArrangedSubview(contentStack)
-        
-        // Available repositories section
-        let availableSection = createRepositorySection(
-            title: "Available Repositories",
-            tableView: &availableTableView
-        )
-        contentStack.addArrangedSubview(availableSection)
-        
-        // Control buttons section
-        let controlSection = createControlSection()
-        contentStack.addArrangedSubview(controlSection)
-        
-        // Monitored repositories section
-        let monitoredSection = createRepositorySection(
-            title: "Monitored Repositories",
-            tableView: &monitoredTableView
-        )
-        contentStack.addArrangedSubview(monitoredSection)
+        // Setup all tabs
+        setupPersonalRepositoriesTab()
+        setupOrganizationsTab()
+        setupMonitoredRepositoriesTab()
+        setupPublicSearchTab()
         
         // Bottom buttons
         let buttonStack = NSStackView()
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 12
         
-        refreshButton = NSButton(title: "Refresh", target: self, action: #selector(refreshRepositories))
+        refreshButton = NSButton(title: "Refresh Current Tab", target: self, action: #selector(refreshCurrentTab))
         closeButton = NSButton(title: "Close", target: self, action: #selector(closeWindow))
         
         buttonStack.addArrangedSubview(NSView()) // Spacer
@@ -122,167 +125,573 @@ public class RepositorySettingsWindow: NSWindowController {
         ])
         
         // Setup table view delegates
-        availableTableView.delegate = self
-        availableTableView.dataSource = self
+        personalTableView.delegate = self
+        personalTableView.dataSource = self
+        orgTableView.delegate = self
+        orgTableView.dataSource = self
+        searchResultsTable.delegate = self
+        searchResultsTable.dataSource = self
         monitoredTableView.delegate = self
         monitoredTableView.dataSource = self
     }
     
-    private func createRepositorySection(title: String, tableView: inout NSTableView!) -> NSView {
-        let section = NSStackView()
-        section.orientation = .vertical
-        section.spacing = 8
+    // MARK: - Tab Setup Methods
+    
+    private func setupPersonalRepositoriesTab() {
+        let tabItem = NSTabViewItem(identifier: "personal")
+        tabItem.label = "Personal"
         
-        // Title
-        let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        section.addArrangedSubview(titleLabel)
+        let tabContent = NSView()
+        // Ensure tab content view expands to fill available tab space
+        tabContent.frame = NSRect(x: 0, y: 0, width: 1000, height: 600)
+        tabContent.autoresizingMask = [.width, .height]
+        // Ensure autoresizing mask is used instead of constraints
+        tabContent.translatesAutoresizingMaskIntoConstraints = true
         
-        // Table view in scroll view
-        tableView = NSTableView()
-        tableView.headerView = nil
-        tableView.rowSizeStyle = .default
-        tableView.selectionHighlightStyle = .regular
+        // Filter and sort controls
+        let controlsStack = NSStackView()
+        controlsStack.orientation = .horizontal
+        controlsStack.spacing = 12
         
-        // Add columns
+        // Filter field
+        personalFilterField = NSTextField()
+        personalFilterField.placeholderString = "Filter repositories..."
+        personalFilterField.delegate = self
+        personalFilterField.target = self
+        personalFilterField.action = #selector(personalFilterChanged)
+        
+        // Sort dropdown
+        personalSortButton = NSPopUpButton()
+        personalSortButton.addItems(withTitles: ["Name (A-Z)", "Name (Z-A)", "Updated (Recent)", "Updated (Oldest)", "Stars (Most)", "Stars (Least)"])
+        personalSortButton.target = self
+        personalSortButton.action = #selector(personalSortChanged)
+        personalSortButton.widthAnchor.constraint(equalToConstant: 150).isActive = true
+        
+        controlsStack.addArrangedSubview(personalFilterField)
+        controlsStack.addArrangedSubview(personalSortButton)
+        controlsStack.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(controlsStack)
+        
+        NSLayoutConstraint.activate([
+            controlsStack.topAnchor.constraint(equalTo: tabContent.topAnchor, constant: 16),
+            controlsStack.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            controlsStack.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16)
+        ])
+        
+        // Repository table
+        personalTableView = NSTableView()
+        personalTableView.rowSizeStyle = .default
+        personalTableView.selectionHighlightStyle = .regular
+        personalTableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        personalTableView.usesAlternatingRowBackgroundColors = true
+        personalTableView.allowsColumnReordering = false
+        personalTableView.allowsColumnResizing = true
+        
+        // Add columns with better width distribution
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameColumn.title = "Repository"
-        nameColumn.width = 200
-        tableView.addTableColumn(nameColumn)
+        nameColumn.width = 400
+        nameColumn.minWidth = 200
+        nameColumn.resizingMask = .autoresizingMask
+        personalTableView.addTableColumn(nameColumn)
+        
+        let visibilityColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("visibility"))
+        visibilityColumn.title = "Visibility"
+        visibilityColumn.width = 100
+        visibilityColumn.minWidth = 80
+        visibilityColumn.resizingMask = .autoresizingMask
+        personalTableView.addTableColumn(visibilityColumn)
+        
+        let languageColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("language"))
+        languageColumn.title = "Language"
+        languageColumn.width = 120
+        languageColumn.minWidth = 80
+        languageColumn.resizingMask = .autoresizingMask
+        personalTableView.addTableColumn(languageColumn)
+        
+        let updatedColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("updated"))
+        updatedColumn.title = "Updated"
+        updatedColumn.width = 150
+        updatedColumn.minWidth = 100
+        updatedColumn.resizingMask = .autoresizingMask
+        personalTableView.addTableColumn(updatedColumn)
+        
+        let scrollView = NSScrollView()
+        scrollView.documentView = personalTableView
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .lineBorder
+        scrollView.autohidesScrollers = false
+        scrollView.hasHorizontalScroller = true
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Add scroll view directly to tab content with explicit constraints instead of stack view
+        tabContent.addSubview(scrollView)
+        
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: controlsStack.bottomAnchor, constant: 12),
+            scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            scrollView.heightAnchor.constraint(equalToConstant: 400)
+        ])
+        
+        // Force the table to size its columns to fill available width
+        personalTableView.sizeLastColumnToFit()
+        
+        // Add button
+        let addButton = NSButton(title: "Add Selected Repository", target: self, action: #selector(addPersonalRepository))
+        addButton.isEnabled = false
+        addButton.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(addButton)
+        
+        NSLayoutConstraint.activate([
+            addButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            addButton.centerXAnchor.constraint(equalTo: tabContent.centerXAnchor),
+            addButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+        ])
+        
+        tabAddButtons.append(addButton)
+        
+        tabItem.view = tabContent
+        tabView.addTabViewItem(tabItem)
+    }
+    
+    private func setupOrganizationsTab() {
+        let tabItem = NSTabViewItem(identifier: "organizations")
+        tabItem.label = "Organizations"
+        
+        let tabContent = NSView()
+        // Ensure tab content view expands to fill available tab space
+        tabContent.frame = NSRect(x: 0, y: 0, width: 1000, height: 600)
+        tabContent.autoresizingMask = [.width, .height]
+        // Ensure autoresizing mask is used instead of constraints
+        tabContent.translatesAutoresizingMaskIntoConstraints = true
+        
+        // Organization selector
+        let orgStack = NSStackView()
+        orgStack.orientation = .horizontal
+        orgStack.spacing = 12
+        orgStack.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(orgStack)
+        
+        let orgLabel = NSTextField(labelWithString: "Organization:")
+        orgLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        orgLabel.widthAnchor.constraint(equalToConstant: 100).isActive = true
+        
+        organizationsPopUp = NSPopUpButton()
+        organizationsPopUp.target = self
+        organizationsPopUp.action = #selector(organizationChanged)
+        
+        orgStack.addArrangedSubview(orgLabel)
+        orgStack.addArrangedSubview(organizationsPopUp)
+        orgStack.addArrangedSubview(NSView()) // Spacer
+        
+        // Filter field
+        orgFilterField = NSTextField()
+        orgFilterField.placeholderString = "Filter organization repositories..."
+        orgFilterField.delegate = self
+        orgFilterField.target = self
+        orgFilterField.action = #selector(orgFilterChanged)
+        orgFilterField.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(orgFilterField)
+        
+        // Repository table
+        orgTableView = NSTableView()
+        orgTableView.rowSizeStyle = .default
+        orgTableView.selectionHighlightStyle = .regular
+        orgTableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        orgTableView.usesAlternatingRowBackgroundColors = true
+        orgTableView.allowsColumnReordering = false
+        orgTableView.allowsColumnResizing = true
+        
+        // Add columns with better width distribution
+        let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        nameColumn.title = "Repository"
+        nameColumn.width = 400
+        nameColumn.minWidth = 200
+        nameColumn.resizingMask = .autoresizingMask
+        orgTableView.addTableColumn(nameColumn)
+        
+        let visibilityColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("visibility"))
+        visibilityColumn.title = "Visibility"
+        visibilityColumn.width = 100
+        visibilityColumn.minWidth = 80
+        visibilityColumn.resizingMask = .autoresizingMask
+        orgTableView.addTableColumn(visibilityColumn)
+        
+        let languageColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("language"))
+        languageColumn.title = "Language"
+        languageColumn.width = 120
+        languageColumn.minWidth = 80
+        languageColumn.resizingMask = .autoresizingMask
+        orgTableView.addTableColumn(languageColumn)
+        
+        let updatedColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("updated"))
+        updatedColumn.title = "Updated"
+        updatedColumn.width = 150
+        updatedColumn.minWidth = 100
+        updatedColumn.resizingMask = .autoresizingMask
+        orgTableView.addTableColumn(updatedColumn)
+        
+        let scrollView = NSScrollView()
+        scrollView.documentView = orgTableView
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .lineBorder
+        scrollView.autohidesScrollers = false
+        scrollView.hasHorizontalScroller = true
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(scrollView)
+        
+        // Force the table to size its columns to fill available width
+        orgTableView.sizeLastColumnToFit()
+        
+        // Add button
+        let addButton = NSButton(title: "Add Selected Repository", target: self, action: #selector(addOrgRepository))
+        addButton.isEnabled = false
+        addButton.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(addButton)
+        tabAddButtons.append(addButton)
+        
+        // Setup explicit constraints
+        NSLayoutConstraint.activate([
+            orgStack.topAnchor.constraint(equalTo: tabContent.topAnchor, constant: 16),
+            orgStack.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            orgStack.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            
+            orgFilterField.topAnchor.constraint(equalTo: orgStack.bottomAnchor, constant: 12),
+            orgFilterField.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            orgFilterField.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            
+            scrollView.topAnchor.constraint(equalTo: orgFilterField.bottomAnchor, constant: 12),
+            scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            scrollView.heightAnchor.constraint(equalToConstant: 400),
+            
+            addButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            addButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            addButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+        ])
+        
+        tabItem.view = tabContent
+        tabView.addTabViewItem(tabItem)
+    }
+    
+    private func setupPublicSearchTab() {
+        let tabItem = NSTabViewItem(identifier: "searchtest")
+        tabItem.label = "Public Search"
+        
+        let tabContent = NSView()
+        // ROBUST FIX: Force explicit content view sizing to prevent NSTabView layout bugs
+        tabContent.frame = NSRect(x: 0, y: 0, width: 1000, height: 600)
+        tabContent.autoresizingMask = [.width, .height]
+        // Use constraints instead of autoresizing mask for more predictable behavior
+        tabContent.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Use stack view approach exactly like the working Monitored tab
+        let mainStack = NSStackView()
+        mainStack.orientation = .vertical
+        mainStack.spacing = 12
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(mainStack)
+        
+        // Info label (minimal like Monitored tab)
+        let infoLabel = NSTextField(labelWithString: "Search for public repositories by name, owner, or keywords")
+        infoLabel.font = NSFont.systemFont(ofSize: 11)
+        infoLabel.textColor = .secondaryLabelColor
+        mainStack.addArrangedSubview(infoLabel)
+        
+        // Search results table - using exactly same structure as monitored table
+        searchResultsTable = NSTableView()
+        searchResultsTable.rowSizeStyle = .default
+        searchResultsTable.selectionHighlightStyle = .regular
+        searchResultsTable.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        searchResultsTable.usesAlternatingRowBackgroundColors = true
+        searchResultsTable.allowsColumnReordering = false
+        searchResultsTable.allowsColumnResizing = true
+        
+        // Add columns with same structure as monitored table
+        let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        nameColumn.title = "Repository"
+        nameColumn.width = 350
+        nameColumn.minWidth = 200
+        nameColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(nameColumn)
         
         let typeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("type"))
         typeColumn.title = "Type"
         typeColumn.width = 80
-        tableView.addTableColumn(typeColumn)
+        typeColumn.minWidth = 70
+        typeColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(typeColumn)
+        
+        let statusColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
+        statusColumn.title = "Last Status"
+        statusColumn.width = 120
+        statusColumn.minWidth = 100
+        statusColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(statusColumn)
+        
+        let addedColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("added"))
+        addedColumn.title = "Added"
+        addedColumn.width = 120
+        addedColumn.minWidth = 100
+        addedColumn.resizingMask = .autoresizingMask
+        searchResultsTable.addTableColumn(addedColumn)
         
         let scrollView = NSScrollView()
-        scrollView.documentView = tableView
+        scrollView.documentView = searchResultsTable
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .lineBorder
+        scrollView.autohidesScrollers = false
+        scrollView.hasHorizontalScroller = true
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
         
-        section.addArrangedSubview(scrollView)
+        // Add scroll view directly to tab content with explicit constraints instead of stack view - EXACTLY like Monitored tab
+        tabContent.addSubview(scrollView)
         
-        return section
-    }
-    
-    private func createManualEntrySection() -> NSView {
-        let section = NSStackView()
-        section.orientation = .vertical
-        section.spacing = 8
+        // Force the table to size its columns to fill available width
+        searchResultsTable.sizeLastColumnToFit()
         
-        // Section title
-        let titleLabel = NSTextField(labelWithString: "Add Repository Manually")
-        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        titleLabel.alignment = .left
-        section.addArrangedSubview(titleLabel)
-        
-        // Instructions
-        let instructionLabel = NSTextField(labelWithString: "Enter repository in format: owner/repo (e.g., microsoft/vscode)")
-        instructionLabel.font = NSFont.systemFont(ofSize: 11)
-        instructionLabel.textColor = .secondaryLabelColor
-        instructionLabel.alignment = .left
-        section.addArrangedSubview(instructionLabel)
-        
-        // Entry row
-        let entryRow = NSStackView()
-        entryRow.orientation = .horizontal
-        entryRow.spacing = 8
-        
-        // Text field with autocomplete
-        repoEntryField = NSTextField()
-        repoEntryField.placeholderString = "owner/repository"
-        repoEntryField.delegate = self
-        repoEntryField.target = self
-        repoEntryField.action = #selector(repoFieldChanged)
-        
-        // Add button
-        addManualButton = NSButton(title: "Add Repository", target: self, action: #selector(addManualRepository))
-        addManualButton.isEnabled = false
-        
-        entryRow.addArrangedSubview(repoEntryField)
-        entryRow.addArrangedSubview(addManualButton)
-        
-        // Set constraints for better layout
-        repoEntryField.widthAnchor.constraint(greaterThanOrEqualToConstant: 300).isActive = true
-        addManualButton.widthAnchor.constraint(equalToConstant: 120).isActive = true
-        
-        section.addArrangedSubview(entryRow)
-        
-        // Separator
-        let separator = NSBox()
-        separator.boxType = .separator
-        section.addArrangedSubview(separator)
-        
-        return section
-    }
-    
-    private func createControlSection() -> NSView {
-        let section = NSStackView()
-        section.orientation = .vertical
-        section.spacing = 12
-        section.alignment = .centerX
-        
-        // Add spacer
-        section.addArrangedSubview(NSView())
-        
-        // Add button
-        addButton = NSButton(title: "→ Add →", target: self, action: #selector(addRepository))
-        addButton.isEnabled = false
-        section.addArrangedSubview(addButton)
-        
-        // Remove button
-        removeButton = NSButton(title: "← Remove ←", target: self, action: #selector(removeRepository))
+        // Remove button - exactly like Monitored tab
+        let removeButton = NSButton(title: "Remove Selected Repository", target: self, action: #selector(addSearchRepository))
         removeButton.isEnabled = false
-        section.addArrangedSubview(removeButton)
+        removeButton.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(removeButton)
         
-        // Add spacer
-        section.addArrangedSubview(NSView())
+        // CRITICAL FIX: Activate all constraints in single call to avoid ambiguous layout
+        NSLayoutConstraint.activate([
+            // Main stack positioning
+            mainStack.topAnchor.constraint(equalTo: tabContent.topAnchor, constant: 16),
+            mainStack.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            mainStack.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            
+            // Scroll view positioning (depends on main stack)
+            scrollView.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: 12),
+            scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            scrollView.heightAnchor.constraint(equalToConstant: 400),
+            
+            // Button positioning (depends on scroll view)
+            removeButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            removeButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            removeButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+        ])
         
-        return section
+        // ROBUST FIX: Add explicit tab content constraints to prevent NSTabView sizing issues
+        tabItem.view = tabContent
+        tabView.addTabViewItem(tabItem)
+        
+        // After adding to tab view, constrain the content view to maintain proper size
+        DispatchQueue.main.async { [weak self] in
+            if let _ = self?.tabView.window {
+                tabContent.widthAnchor.constraint(greaterThanOrEqualToConstant: 950).isActive = true
+                tabContent.heightAnchor.constraint(greaterThanOrEqualToConstant: 500).isActive = true
+            }
+        }
     }
+    
+    private func setupMonitoredRepositoriesTab() {
+        let tabItem = NSTabViewItem(identifier: "monitored")
+        tabItem.label = "Monitored"
+        
+        let tabContent = NSView()
+        // ROBUST FIX: Force explicit content view sizing to prevent NSTabView layout bugs
+        tabContent.frame = NSRect(x: 0, y: 0, width: 1000, height: 600)
+        tabContent.autoresizingMask = [.width, .height]
+        // Use constraints instead of autoresizing mask for more predictable behavior
+        tabContent.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Use stack view approach like the working Personal tab
+        let mainStack = NSStackView()
+        mainStack.orientation = .vertical
+        mainStack.spacing = 12
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(mainStack)
+        
+        // Info label
+        let infoLabel = NSTextField(labelWithString: "Repositories currently being monitored for workflow status")
+        infoLabel.font = NSFont.systemFont(ofSize: 11)
+        infoLabel.textColor = .secondaryLabelColor
+        mainStack.addArrangedSubview(infoLabel)
+        
+        // Monitored repositories table
+        monitoredTableView = NSTableView()
+        monitoredTableView.rowSizeStyle = .default
+        monitoredTableView.selectionHighlightStyle = .regular
+        monitoredTableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        monitoredTableView.usesAlternatingRowBackgroundColors = true
+        monitoredTableView.allowsColumnReordering = false
+        monitoredTableView.allowsColumnResizing = true
+        
+        // Add columns with better width distribution
+        let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        nameColumn.title = "Repository"
+        nameColumn.width = 350
+        nameColumn.minWidth = 200
+        nameColumn.resizingMask = .autoresizingMask
+        monitoredTableView.addTableColumn(nameColumn)
+        
+        let typeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("type"))
+        typeColumn.title = "Type"
+        typeColumn.width = 80
+        typeColumn.minWidth = 70
+        typeColumn.resizingMask = .autoresizingMask
+        monitoredTableView.addTableColumn(typeColumn)
+        
+        let statusColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
+        statusColumn.title = "Last Status"
+        statusColumn.width = 120
+        statusColumn.minWidth = 100
+        statusColumn.resizingMask = .autoresizingMask
+        monitoredTableView.addTableColumn(statusColumn)
+        
+        let addedColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("added"))
+        addedColumn.title = "Added"
+        addedColumn.width = 120
+        addedColumn.minWidth = 100
+        addedColumn.resizingMask = .autoresizingMask
+        monitoredTableView.addTableColumn(addedColumn)
+        
+        let scrollView = NSScrollView()
+        scrollView.documentView = monitoredTableView
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .lineBorder
+        scrollView.autohidesScrollers = false
+        scrollView.hasHorizontalScroller = true
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Add scroll view directly to tab content with explicit constraints instead of stack view
+        tabContent.addSubview(scrollView)
+        
+        // Force the table to size its columns to fill available width
+        monitoredTableView.sizeLastColumnToFit()
+        
+        // Remove button - use dedicated instance property to prevent external conflicts
+        monitoredRemoveButton = NSButton(title: "Remove Selected Repository", target: self, action: #selector(removeRepository))
+        monitoredRemoveButton.isEnabled = false
+        monitoredRemoveButton.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(monitoredRemoveButton)
+        
+        // CRITICAL FIX: Activate all constraints in single call to avoid ambiguous layout
+        NSLayoutConstraint.activate([
+            // Main stack positioning
+            mainStack.topAnchor.constraint(equalTo: tabContent.topAnchor, constant: 16),
+            mainStack.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            mainStack.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            
+            // Scroll view positioning (depends on main stack)
+            scrollView.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: 12),
+            scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
+            scrollView.heightAnchor.constraint(equalToConstant: 400),
+            
+            // Button positioning (depends on scroll view)
+            monitoredRemoveButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            monitoredRemoveButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            monitoredRemoveButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+        ])
+        
+        // ROBUST FIX: Add explicit tab content constraints to prevent NSTabView sizing issues
+        tabItem.view = tabContent
+        tabView.addTabViewItem(tabItem)
+        
+        // After adding to tab view, constrain the content view to maintain proper size
+        DispatchQueue.main.async { [weak self] in
+            if let _ = self?.tabView.window {
+                tabContent.widthAnchor.constraint(greaterThanOrEqualToConstant: 950).isActive = true
+                tabContent.heightAnchor.constraint(greaterThanOrEqualToConstant: 500).isActive = true
+            }
+        }
+    }
+    
+    // MARK: - Data Loading Methods
     
     private func loadData() {
         // Load monitored repositories (always available without authentication)
         monitoredRepositories = repositoryManager.getMonitoredRepositories()
         monitoredTableView.reloadData()
         
-        // Load available repositories if authenticated
+        // Load data for other tabs if authenticated
         if GitHubOAuthConfig.isConfigured {
-            fetchAvailableRepositories()
-        } else {
-            // Show empty available repositories (user can still manage monitored ones)
-            availableRepositories = []
-            availableTableView.reloadData()
+            loadPersonalRepositories()
+            loadUserOrganizations()
         }
     }
     
-    private func fetchAvailableRepositories() {
+    private func loadPersonalRepositories() {
         showLoading(true)
         
-        repositoryManager.fetchAvailableRepositories { [weak self] (result: Result<[Repository], GitHubClient.GitHubError>) in
+        gitHubClient.getRepositories { [weak self] result in
             DispatchQueue.main.async {
                 self?.showLoading(false)
                 
                 switch result {
                 case .success(let repositories):
-                    self?.availableRepositories = repositories
-                    self?.availableTableView.reloadData()
+                    self?.personalRepositories = repositories
+                    self?.personalTableView.reloadData()
                     
                 case .failure(let error):
-                    self?.showError("Failed to fetch repositories: \(error.localizedDescription)")
+                    self?.showError("Failed to fetch personal repositories: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func loadUserOrganizations() {
+        gitHubClient.getUserOrganizations { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let organizations):
+                    self?.userOrganizations = organizations
+                    self?.organizationsPopUp.removeAllItems()
+                    
+                    if organizations.isEmpty {
+                        self?.organizationsPopUp.addItem(withTitle: "No organizations")
+                        self?.organizationsPopUp.isEnabled = false
+                    } else {
+                        self?.organizationsPopUp.addItem(withTitle: "Select organization...")
+                        for org in organizations {
+                            self?.organizationsPopUp.addItem(withTitle: org.login)
+                        }
+                        self?.organizationsPopUp.isEnabled = true
+                    }
+                    
+                case .failure(let error):
+                    self?.organizationsPopUp.removeAllItems()
+                    self?.organizationsPopUp.addItem(withTitle: "Failed to load organizations")
+                    self?.organizationsPopUp.isEnabled = false
+                    StatusBarDebugger.shared.log(.error, "Failed to load organizations", context: ["error": error.localizedDescription])
+                }
+            }
+        }
+    }
+    
+    private func loadOrganizationRepositories(for orgLogin: String) {
+        showLoading(true)
+        
+        gitHubClient.getOrganizationRepositories(org: orgLogin) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.showLoading(false)
+                
+                switch result {
+                case .success(let repositories):
+                    self?.selectedOrgRepositories = repositories
+                    self?.orgTableView.reloadData()
+                    
+                case .failure(let error):
+                    self?.showError("Failed to fetch repositories for \(orgLogin): \(error.localizedDescription)")
                 }
             }
         }
     }
     
     private func showLoading(_ show: Bool) {
-        loadingIndicator.isHidden = !show
+        loadingIndicator?.isHidden = !show
         if show {
-            loadingIndicator.startAnimation(nil)
+            loadingIndicator?.startAnimation(nil)
         } else {
-            loadingIndicator.stopAnimation(nil)
+            loadingIndicator?.stopAnimation(nil)
         }
-        refreshButton.isEnabled = !show
+        refreshButton?.isEnabled = !show
     }
     
     private func showAuthenticationInfo() {
@@ -300,58 +709,112 @@ public class RepositorySettingsWindow: NSWindowController {
         }
     }
     
-    // MARK: - Actions
+    // MARK: - Action Methods
     
-    @objc private func repoFieldChanged() {
-        let text = repoEntryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        addManualButton.isEnabled = isValidRepositoryFormat(text)
-        
-        // Update autocomplete suggestions
-        updateAutocompleteSuggestions(for: text)
+    // Personal Repositories Tab Actions
+    @objc private func personalFilterChanged() {
+        personalTableView.reloadData()
     }
     
-    @objc private func addManualRepository() {
-        let repoText = repoEntryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    @objc private func personalSortChanged() {
+        personalRepositories = sortRepositories(personalRepositories, by: personalSortButton.indexOfSelectedItem)
+        personalTableView.reloadData()
+    }
+    
+    @objc private func addPersonalRepository() {
+        let selectedRow = personalTableView.selectedRow
+        guard selectedRow >= 0 && selectedRow < filteredPersonalRepositories().count else { return }
         
-        guard isValidRepositoryFormat(repoText) else {
-            showError("Please enter a valid repository format: owner/repo")
+        let repository = filteredPersonalRepositories()[selectedRow]
+        addRepositoryToMonitored(repository)
+    }
+    
+    // Organizations Tab Actions
+    @objc private func organizationChanged() {
+        let selectedIndex = organizationsPopUp.indexOfSelectedItem
+        guard selectedIndex > 0, selectedIndex <= userOrganizations.count else {
+            selectedOrgRepositories = []
+            orgTableView.reloadData()
             return
         }
         
-        // Parse owner and repo name
-        let parts = repoText.split(separator: "/")
-        let owner = String(parts[0])
-        let repo = String(parts[1])
+        let selectedOrg = userOrganizations[selectedIndex - 1]
+        loadOrganizationRepositories(for: selectedOrg.login)
+    }
+    
+    @objc private func orgFilterChanged() {
+        orgTableView.reloadData()
+    }
+    
+    @objc private func addOrgRepository() {
+        let selectedRow = orgTableView.selectedRow
+        guard selectedRow >= 0 && selectedRow < filteredOrgRepositories().count else { return }
         
-        StatusBarDebugger.shared.log(.menu, "Adding manual repository", context: ["repo": repoText])
-        
-        // Check if repository is already monitored
-        if monitoredRepositories.contains(where: { $0.fullName.lowercased() == repoText.lowercased() }) {
-            showError("Repository '\(repoText)' is already being monitored")
+        let repository = filteredOrgRepositories()[selectedRow]
+        addRepositoryToMonitored(repository)
+    }
+    
+    // Public Search Tab Actions
+    @objc private func searchFieldChanged() {
+        let text = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchButton.isEnabled = !text.isEmpty && text.count >= 2
+    }
+    
+    @objc private func performRepositorySearch() {
+        let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty && query.count >= 2 else {
+            showError("Please enter at least 2 characters to search")
             return
         }
         
-        // Try to fetch repository info from GitHub first to validate it exists
-        validateAndAddRepository(owner: owner, repo: repo, fullName: repoText)
-    }
-    
-    @objc private func addRepository() {
-        let selectedRow = availableTableView.selectedRow
-        guard selectedRow >= 0 && selectedRow < availableRepositories.count else { return }
+        guard !isSearching else { return }
         
-        let repository = availableRepositories[selectedRow]
-        let monitoredRepo = MonitoredRepository(from: repository)
+        StatusBarDebugger.shared.log(.menu, "Performing repository search", context: ["query": query])
         
-        if repositoryManager.addRepository(monitoredRepo) {
-            monitoredRepositories = repositoryManager.getMonitoredRepositories()
-            monitoredTableView.reloadData()
-            
-            // Clear selection and update button state
-            availableTableView.deselectAll(nil)
-            updateButtonStates()
+        isSearching = true
+        searchButton.title = "Searching..."
+        searchButton.isEnabled = false
+        
+        gitHubClient.searchPublicRepositories(query: query, sort: "stars", order: "desc", page: 1, perPage: 20) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                self.isSearching = false
+                self.searchButton.title = "Search"
+                self.searchButton.isEnabled = true
+                
+                switch result {
+                case .success(let searchResponse):
+                    self.searchResults = searchResponse.items
+                    self.searchResultsTable.reloadData()
+                    
+                    StatusBarDebugger.shared.log(.menu, "Repository search completed", context: [
+                        "query": query,
+                        "results": searchResponse.items.count,
+                        "totalCount": searchResponse.totalCount
+                    ])
+                    
+                case .failure(let error):
+                    StatusBarDebugger.shared.log(.error, "Repository search failed", context: [
+                        "query": query,
+                        "error": error.localizedDescription
+                    ])
+                    
+                    self.showError("Search failed: \(error.localizedDescription)")
+                }
+            }
         }
     }
     
+    @objc private func addSearchRepository() {
+        let selectedRow = searchResultsTable.selectedRow
+        guard selectedRow >= 0 && selectedRow < searchResults.count else { return }
+        
+        let repository = searchResults[selectedRow]
+        addRepositoryToMonitored(repository)
+    }
+    
+    // Monitored Repositories Tab Actions
     @objc private func removeRepository() {
         let selectedRow = monitoredTableView.selectedRow
         guard selectedRow >= 0 && selectedRow < monitoredRepositories.count else { return }
@@ -364,24 +827,42 @@ public class RepositorySettingsWindow: NSWindowController {
             
             // Clear selection and update button state
             monitoredTableView.deselectAll(nil)
-            updateButtonStates()
+            monitoredRemoveButton.isEnabled = false
+            
+            StatusBarDebugger.shared.log(.menu, "Repository removed from monitoring", context: ["repo": repository.fullName])
         }
     }
     
-    @objc private func refreshRepositories() {
-        StatusBarDebugger.shared.log(.menu, "Repository settings refresh clicked")
+    // Common Actions
+    @objc private func refreshCurrentTab() {
+        guard let currentTab = tabView.selectedTabViewItem?.identifier as? String else { return }
         
-        if GitHubOAuthConfig.isConfigured {
-            fetchAvailableRepositories()
-        } else {
-            // Show a helpful message instead of trying to fetch
-            let alert = NSAlert()
-            alert.messageText = "GitHub Authentication Required"
-            alert.informativeText = "To see available repositories, please connect to GitHub from the status bar menu first."
-            alert.addButton(withTitle: "OK")
-            if let window = window {
-                alert.beginSheetModal(for: window)
+        StatusBarDebugger.shared.log(.menu, "Refreshing current tab", context: ["tab": currentTab])
+        
+        switch currentTab {
+        case "personal":
+            if GitHubOAuthConfig.isConfigured {
+                loadPersonalRepositories()
             }
+        case "organizations":
+            if GitHubOAuthConfig.isConfigured {
+                loadUserOrganizations()
+                if organizationsPopUp.indexOfSelectedItem > 0 {
+                    organizationChanged()
+                }
+            }
+        case "search":
+            // Clear previous search results
+            searchResults = []
+            searchResultsTable.reloadData()
+            searchField.stringValue = ""
+            searchButton.isEnabled = false
+        case "monitored":
+            // Skip data reload during tab switching to prevent layout race conditions
+            // Data is already loaded in loadData() and updated when repositories change
+            break
+        default:
+            break
         }
     }
     
@@ -403,135 +884,99 @@ public class RepositorySettingsWindow: NSWindowController {
         }
     }
     
-    private func updateButtonStates() {
-        addButton.isEnabled = availableTableView.selectedRow >= 0
-        removeButton.isEnabled = monitoredTableView.selectedRow >= 0
-    }
+    // MARK: - Helper Methods
     
-    // MARK: - Manual Repository Entry Helpers
-    
-    private func isValidRepositoryFormat(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = trimmed.split(separator: "/")
+    private func addRepositoryToMonitored(_ repository: Repository) {
+        StatusBarDebugger.shared.log(.menu, "Adding repository to monitoring", context: ["repo": repository.fullName])
         
-        // Must have exactly 2 parts (owner/repo)
-        guard parts.count == 2 else { return false }
-        
-        // Both parts must be non-empty and contain valid characters
-        let owner = String(parts[0])
-        let repo = String(parts[1])
-        
-        let validCharacterSet = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
-        
-        return !owner.isEmpty && 
-               !repo.isEmpty && 
-               owner.rangeOfCharacter(from: validCharacterSet.inverted) == nil &&
-               repo.rangeOfCharacter(from: validCharacterSet.inverted) == nil
-    }
-    
-    private func updateAutocompleteSuggestions(for text: String) {
-        // Create suggestions from available repositories and monitored repositories
-        var suggestions: [String] = []
-        
-        // Add from available repositories
-        for repo in availableRepositories {
-            if repo.fullName.lowercased().hasPrefix(text.lowercased()) {
-                suggestions.append(repo.fullName)
-            }
+        // Check if repository is already monitored
+        if monitoredRepositories.contains(where: { $0.fullName.lowercased() == repository.fullName.lowercased() }) {
+            showError("Repository '\(repository.fullName)' is already being monitored")
+            return
         }
         
-        // Add from monitored repositories (for reference)
-        for repo in monitoredRepositories {
-            if repo.fullName.lowercased().hasPrefix(text.lowercased()) && !suggestions.contains(repo.fullName) {
-                suggestions.append(repo.fullName + " (already monitored)")
-            }
-        }
+        let monitoredRepo = MonitoredRepository(from: repository)
         
-        // Add some common repository patterns if the user is typing owner/
-        if text.contains("/") && text.split(separator: "/").count == 2 {
-            let parts = text.split(separator: "/")
-            let owner = String(parts[0])
-            let partialRepo = String(parts[1])
+        if repositoryManager.addRepository(monitoredRepo) {
+            monitoredRepositories = repositoryManager.getMonitoredRepositories()
+            monitoredTableView.reloadData()
             
-            if !partialRepo.isEmpty {
-                // Common repository name patterns
-                let commonPatterns = ["backend", "frontend", "api", "web", "app", "mobile", "desktop", "cli", "docs", "website"]
-                for pattern in commonPatterns {
-                    if pattern.hasPrefix(partialRepo.lowercased()) {
-                        let suggestion = "\(owner)/\(pattern)"
-                        if !suggestions.contains(suggestion) {
-                            suggestions.append(suggestion)
-                        }
-                    }
-                }
+            StatusBarDebugger.shared.log(.menu, "Successfully added repository to monitoring", context: ["repo": repository.fullName])
+            
+            // Show success message
+            let alert = NSAlert()
+            alert.messageText = "Repository Added"
+            alert.informativeText = "Successfully added '\(repository.fullName)' to monitoring list"
+            alert.addButton(withTitle: "OK")
+            if let window = window {
+                alert.beginSheetModal(for: window)
             }
+        } else {
+            showError("Failed to add repository to monitoring list")
         }
-        
-        repoSuggestions = Array(suggestions.prefix(10)) // Limit to 10 suggestions
-        
-        // Update the text field's completion
-        repoEntryField.stringValue = text
     }
     
-    private func validateAndAddRepository(owner: String, repo: String, fullName: String) {
-        // Show loading state
-        addManualButton.isEnabled = false
-        addManualButton.title = "Validating..."
-        
-        // Use retained GitHub client to validate the repository
-        gitHubClient.getRepository(owner: owner, repo: repo) { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                
-                self.addManualButton.title = "Add Repository"
-                
-                switch result {
-                case .success(let repository):
-                    // Repository exists, create monitored repository and add it
-                    let monitoredRepo = MonitoredRepository(from: repository)
-                    
-                    if self.repositoryManager.addRepository(monitoredRepo) {
-                        self.monitoredRepositories = self.repositoryManager.getMonitoredRepositories()
-                        self.monitoredTableView.reloadData()
-                        
-                        // Clear the text field
-                        self.repoEntryField.stringValue = ""
-                        self.addManualButton.isEnabled = false
-                        
-                        StatusBarDebugger.shared.log(.menu, "Successfully added manual repository", context: ["repo": fullName])
-                        
-                        // Show success message
-                        let alert = NSAlert()
-                        alert.messageText = "Repository Added"
-                        alert.informativeText = "Successfully added '\(fullName)' to monitoring list"
-                        alert.addButton(withTitle: "OK")
-                        if let window = self.window {
-                            alert.beginSheetModal(for: window)
-                        }
-                    } else {
-                        self.showError("Failed to add repository to monitoring list")
-                    }
-                    
-                case .failure(let error):
-                    StatusBarDebugger.shared.log(.error, "Failed to validate repository", context: ["repo": fullName, "error": error.localizedDescription])
-                    
-                    // Check if it's a not found error or access denied
-                    switch error {
-                    case .notFound:
-                        self.showError("Repository '\(fullName)' not found. Please check the owner and repository name.")
-                    case .rateLimitExceeded:
-                        self.showError("GitHub rate limit exceeded. Please try again later.")
-                    case .unauthorized:
-                        self.showError("Access denied. The repository may be private and require authentication.")
-                    default:
-                        self.showError("Failed to validate repository: \(error.localizedDescription)")
-                    }
-                    
-                    self.addManualButton.isEnabled = self.isValidRepositoryFormat(self.repoEntryField.stringValue)
-                }
-            }
+    private func filteredPersonalRepositories() -> [Repository] {
+        let filter = personalFilterField.stringValue.lowercased()
+        if filter.isEmpty {
+            return personalRepositories
+        }
+        return personalRepositories.filter { repo in
+            repo.fullName.lowercased().contains(filter) ||
+            (repo.description?.lowercased().contains(filter) ?? false) ||
+            (repo.language?.lowercased().contains(filter) ?? false)
         }
     }
+    
+    private func filteredOrgRepositories() -> [Repository] {
+        let filter = orgFilterField.stringValue.lowercased()
+        if filter.isEmpty {
+            return selectedOrgRepositories
+        }
+        return selectedOrgRepositories.filter { repo in
+            repo.fullName.lowercased().contains(filter) ||
+            (repo.description?.lowercased().contains(filter) ?? false) ||
+            (repo.language?.lowercased().contains(filter) ?? false)
+        }
+    }
+    
+    private func sortRepositories(_ repositories: [Repository], by sortIndex: Int) -> [Repository] {
+        switch sortIndex {
+        case 0: // Name (A-Z)
+            return repositories.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        case 1: // Name (Z-A)
+            return repositories.sorted { $0.name.lowercased() > $1.name.lowercased() }
+        case 2: // Updated (Recent) - Note: we don't have updatedAt field, so sort by name for now
+            return repositories.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        case 3: // Updated (Oldest)
+            return repositories.sorted { $0.name.lowercased() > $1.name.lowercased() }
+        case 4: // Stars (Most)
+            return repositories.sorted { ($0.stargazersCount ?? 0) > ($1.stargazersCount ?? 0) }
+        case 5: // Stars (Least)
+            return repositories.sorted { ($0.stargazersCount ?? 0) < ($1.stargazersCount ?? 0) }
+        default:
+            return repositories
+        }
+    }
+    
+    private func updateTabButtonStates() {
+        // Update button states based on current tab selection
+        guard let currentTab = tabView.selectedTabViewItem?.identifier as? String else { return }
+        
+        switch currentTab {
+        case "personal":
+            tabAddButtons[0].isEnabled = personalTableView.selectedRow >= 0
+        case "organizations":
+            tabAddButtons[1].isEnabled = orgTableView.selectedRow >= 0
+        case "search":
+            tabAddButtons[2].isEnabled = searchResultsTable.selectedRow >= 0
+        case "monitored":
+            monitoredRemoveButton.isEnabled = monitoredTableView.selectedRow >= 0
+        default:
+            break
+        }
+    }
+    
 }
 
 // MARK: - NSTextFieldDelegate
@@ -539,17 +984,25 @@ public class RepositorySettingsWindow: NSWindowController {
 extension RepositorySettingsWindow: NSTextFieldDelegate {
     
     public func controlTextDidChange(_ obj: Notification) {
-        if let textField = obj.object as? NSTextField, textField == repoEntryField {
-            repoFieldChanged()
+        guard let textField = obj.object as? NSTextField else { return }
+        
+        if textField == searchField {
+            searchFieldChanged()
+        } else if textField == personalFilterField {
+            personalFilterChanged()
+        } else if textField == orgFilterField {
+            orgFilterChanged()
         }
     }
     
     public func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-        // Handle Enter key to trigger add action
+        // Handle Enter key for different text fields
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-            if addManualButton.isEnabled {
-                addManualRepository()
-                return true
+            if let textField = control as? NSTextField {
+                if textField == searchField && searchButton.isEnabled {
+                    performRepositorySearch()
+                    return true
+                }
             }
         }
         return false
@@ -561,12 +1014,12 @@ extension RepositorySettingsWindow: NSTextFieldDelegate {
 extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
     
     public func numberOfRows(in tableView: NSTableView) -> Int {
-        if tableView == availableTableView {
-            // Show at least one row for info message if not authenticated and no repositories
-            if availableRepositories.isEmpty && !GitHubOAuthConfig.isConfigured {
-                return 1
-            }
-            return availableRepositories.count
+        if tableView == personalTableView {
+            return filteredPersonalRepositories().count
+        } else if tableView == orgTableView {
+            return filteredOrgRepositories().count
+        } else if tableView == searchResultsTable {
+            return searchResults.count
         } else if tableView == monitoredTableView {
             return monitoredRepositories.count
         }
@@ -576,90 +1029,184 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
     public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = tableColumn?.identifier ?? NSUserInterfaceItemIdentifier("")
         
-        if tableView == availableTableView {
-            // Show info message if not authenticated and no repositories
-            if availableRepositories.isEmpty && !GitHubOAuthConfig.isConfigured && row == 0 {
-                let cellView = NSTableCellView()
-                let textField = NSTextField()
-                textField.isBordered = false
-                textField.isEditable = false
-                textField.backgroundColor = .clear
-                textField.translatesAutoresizingMaskIntoConstraints = false
-                textField.textColor = .secondaryLabelColor
-                textField.font = NSFont.systemFont(ofSize: 12)
-                
-                if identifier.rawValue == "name" {
-                    textField.stringValue = "Connect to GitHub to see repositories"
-                } else if identifier.rawValue == "type" {
-                    textField.stringValue = "—"
-                }
-                
-                cellView.addSubview(textField)
-                NSLayoutConstraint.activate([
-                    textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
-                    textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
-                    textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
-                ])
-                
-                return cellView
-            }
+        let cellView = NSTableCellView()
+        let textField = NSTextField()
+        textField.isBordered = false
+        textField.isEditable = false
+        textField.backgroundColor = .clear
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        
+        if tableView == personalTableView {
+            let repositories = filteredPersonalRepositories()
+            guard row < repositories.count else { return nil }
+            let repository = repositories[row]
             
-            guard row < availableRepositories.count else { return nil }
-            let repository = availableRepositories[row]
+            configureRepositoryCell(textField: textField, repository: repository, identifier: identifier.rawValue)
             
-            let cellView = NSTableCellView()
-            let textField = NSTextField()
-            textField.isBordered = false
-            textField.isEditable = false
-            textField.backgroundColor = .clear
-            textField.translatesAutoresizingMaskIntoConstraints = false
+        } else if tableView == orgTableView {
+            let repositories = filteredOrgRepositories()
+            guard row < repositories.count else { return nil }
+            let repository = repositories[row]
             
-            if identifier.rawValue == "name" {
-                textField.stringValue = repository.fullName
-            } else if identifier.rawValue == "type" {
-                textField.stringValue = repository.private ? "Private" : "Public"
-            }
+            configureRepositoryCell(textField: textField, repository: repository, identifier: identifier.rawValue)
             
-            cellView.addSubview(textField)
-            NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
-                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
-                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
-            ])
+        } else if tableView == searchResultsTable {
+            guard row < searchResults.count else { return nil }
+            let repository = searchResults[row]
             
-            return cellView
+            configureSearchResultCell(textField: textField, repository: repository, identifier: identifier.rawValue)
             
         } else if tableView == monitoredTableView {
             guard row < monitoredRepositories.count else { return nil }
             let repository = monitoredRepositories[row]
             
-            let cellView = NSTableCellView()
-            let textField = NSTextField()
-            textField.isBordered = false
-            textField.isEditable = false
-            textField.backgroundColor = .clear
-            textField.translatesAutoresizingMaskIntoConstraints = false
-            
-            if identifier.rawValue == "name" {
-                textField.stringValue = repository.fullName
-            } else if identifier.rawValue == "type" {
-                textField.stringValue = repository.isPrivate ? "Private" : "Public"
-            }
-            
-            cellView.addSubview(textField)
-            NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
-                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
-                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
-            ])
-            
-            return cellView
+            configureMonitoredCell(textField: textField, repository: repository, identifier: identifier.rawValue)
         }
         
-        return nil
+        cellView.addSubview(textField)
+        NSLayoutConstraint.activate([
+            textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
+            textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
+            textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+        ])
+        
+        return cellView
+    }
+    
+    private func configureRepositoryCell(textField: NSTextField, repository: Repository, identifier: String) {
+        switch identifier {
+        case "name":
+            textField.stringValue = repository.fullName
+            textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        case "visibility":
+            textField.stringValue = repository.private ? "Private" : "Public"
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .secondaryLabelColor
+        case "language":
+            textField.stringValue = repository.language ?? "—"
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .secondaryLabelColor
+        case "updated":
+            textField.stringValue = "Recently" // We don't have updated date, placeholder
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .secondaryLabelColor
+        default:
+            break
+        }
+    }
+    
+    private func configureSearchResultCell(textField: NSTextField, repository: Repository, identifier: String) {
+        switch identifier {
+        case "name":
+            textField.stringValue = repository.fullName
+            textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        case "description":
+            textField.stringValue = repository.description ?? "No description"
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = repository.description != nil ? .labelColor : .secondaryLabelColor
+            textField.lineBreakMode = .byTruncatingTail
+        case "language":
+            textField.stringValue = repository.language ?? "—"
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .secondaryLabelColor
+        case "stars":
+            if let stars = repository.stargazersCount {
+                textField.stringValue = stars >= 1000 ? String(format: "%.1fk", Double(stars) / 1000) : "\(stars)"
+            } else {
+                textField.stringValue = "0"
+            }
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .secondaryLabelColor
+            textField.alignment = .right
+        default:
+            break
+        }
+    }
+    
+    private func configureMonitoredCell(textField: NSTextField, repository: MonitoredRepository, identifier: String) {
+        switch identifier {
+        case "name":
+            textField.stringValue = repository.fullName
+            textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        case "type":
+            textField.stringValue = repository.isPrivate ? "Private" : "Public"
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .secondaryLabelColor
+        case "status":
+            textField.stringValue = "Monitoring" // Placeholder - could show actual status
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .systemGreen
+        case "added":
+            textField.stringValue = "Recently" // Placeholder - could show actual date
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = .secondaryLabelColor
+        default:
+            break
+        }
     }
     
     public func tableViewSelectionDidChange(_ notification: Notification) {
-        updateButtonStates()
+        updateTabButtonStates()
     }
+}
+
+// MARK: - NSTabViewDelegate
+
+extension RepositorySettingsWindow: NSTabViewDelegate {
+    
+    public func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
+        // Update button states when tab changes
+        updateTabButtonStates()
+        
+        // Load data for the newly selected tab if needed
+        guard let identifier = tabViewItem?.identifier as? String else { return }
+        
+        StatusBarDebugger.shared.log(.menu, "Tab changed", context: ["tab": identifier])
+        
+        switch identifier {
+        case "personal":
+            if GitHubOAuthConfig.isConfigured && personalRepositories.isEmpty {
+                loadPersonalRepositories()
+            }
+        case "organizations":
+            if GitHubOAuthConfig.isConfigured && userOrganizations.isEmpty {
+                loadUserOrganizations()
+            }
+        case "search":
+            // Nothing to load automatically for search tab
+            break
+        case "monitored":
+            // Refresh monitored repositories to show latest state
+            monitoredRepositories = repositoryManager.getMonitoredRepositories()
+            monitoredTableView.reloadData()
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Testing Support Methods
+    
+    #if DEBUG
+    public func setTestData(monitoredRepositories: [MonitoredRepository]? = nil, searchResults: [Repository]? = nil) {
+        // Ensure we're on the main thread for UI updates
+        DispatchQueue.main.async { [weak self] in
+            if let monitored = monitoredRepositories {
+                self?.monitoredRepositories = monitored
+                self?.monitoredTableView.reloadData()
+                print("🧪 Test: Set monitored repositories to \(monitored.count) items")
+                print("🔍 Test: monitoredTableView.numberOfRows after reload = \(self?.monitoredTableView.numberOfRows ?? -1)")
+            }
+            
+            if let search = searchResults {
+                self?.searchResults = search
+                self?.searchResultsTable.reloadData()
+                print("🧪 Test: Set search results to \(search.count) items")
+                print("🔍 Test: searchResultsTable.numberOfRows after reload = \(self?.searchResultsTable.numberOfRows ?? -1)")
+            }
+            
+            // Force layout update after data changes
+            self?.window?.contentView?.layoutSubtreeIfNeeded()
+        }
+    }
+    #endif
 }

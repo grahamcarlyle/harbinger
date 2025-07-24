@@ -223,7 +223,7 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(repository.displayName, "owner/test-repo")
         XCTAssertEqual(repository.ownerName, "owner")
         XCTAssertTrue(repository.`private`)
-        XCTAssertTrue(repository.isActive)
+        // XCTAssertTrue(repository.isActive) // isActive is not a property of Repository
         XCTAssertEqual(repository.language, "Swift")
         
         print("✅ Successfully decoded repository model")

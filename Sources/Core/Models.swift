@@ -10,15 +10,18 @@ public struct Repository: Codable {
     let `private`: Bool             // Used for privacy status display
     let htmlUrl: String             // Used for clickable GitHub links
     
+    // Additional fields for search results display
+    let description: String?        // Repository description for search results
+    let language: String?           // Primary language for search results
+    let stargazersCount: Int?       // Star count for search results
+    
     // Commented out unused fields to make decoding more robust
     // let id: Int
-    // let description: String?
     // let fork: Bool
     // let archived: Bool
     // let disabled: Bool
     // let hasActions: Bool?
     // let defaultBranch: String
-    // let language: String?
     // let updatedAt: String
     
     // Note: `private` is a Swift keyword, so we need to escape it with backticks
@@ -56,6 +59,16 @@ public struct Organization: Codable {
     let url: String
     let reposUrl: String
     let description: String?
+    
+    // Using automatic snake_case conversion
+}
+
+// MARK: - Repository Search Models
+
+public struct RepositorySearchResponse: Codable {
+    let totalCount: Int
+    let incompleteResults: Bool
+    let items: [Repository]
     
     // Using automatic snake_case conversion
 }

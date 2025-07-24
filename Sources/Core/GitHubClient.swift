@@ -142,6 +142,46 @@ public class GitHubClient {
         }.resume()
     }
     
+    // MARK: - Public Repository Search
+    
+    public func searchPublicRepositories(query: String, sort: String = "updated", order: String = "desc", page: Int = 1, perPage: Int = 30, completion: @escaping (Result<RepositorySearchResponse, GitHubError>) -> Void) {
+        // Construct search query URL
+        var components = URLComponents(string: "\(baseURL)/search/repositories")!
+        
+        let queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "sort", value: sort),
+            URLQueryItem(name: "order", value: order),
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "per_page", value: String(perPage))
+        ]
+        
+        components.queryItems = queryItems
+        
+        guard let url = components.url else {
+            completion(.failure(.invalidURL))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        
+        // Add authorization if available for higher rate limits
+        if let accessToken = GitHubOAuthConfig.accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        request.setValue("Harbinger/1.0", forHTTPHeaderField: "User-Agent")
+        
+        print("🔧 GitHubClient: Searching public repositories for query: \(query)")
+        
+        session.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                self?.handleSearchResponse(data: data, response: response, error: error, completion: completion)
+            }
+        }.resume()
+    }
+    
     public func getWorkflows(owner: String, repo: String, completion: @escaping (Result<WorkflowsResponse, GitHubError>) -> Void) {
         guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/actions/workflows") else {
             completion(.failure(.invalidURL))
@@ -599,6 +639,76 @@ public class GitHubClient {
             completion(.failure(.decodingError(error.localizedDescription)))
         }
     }
+    
+    private func handleSearchResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<RepositorySearchResponse, GitHubError>) -> Void) {
+        
+        if let error = error {
+            print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+            completion(.failure(.networkError(error.localizedDescription)))
+            return
+        }
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ GitHubClient: Invalid response")
+            completion(.failure(.invalidResponse))
+            return
+        }
+        
+        // Handle different HTTP status codes
+        switch httpResponse.statusCode {
+        case 200:
+            break // Success
+        case 401:
+            print("❌ GitHubClient: Authentication failed")
+            completion(.failure(.authenticationError))
+            return
+        case 403:
+            if let rateLimitRemaining = httpResponse.allHeaderFields["X-RateLimit-Remaining"] as? String,
+               rateLimitRemaining == "0" {
+                print("❌ GitHubClient: Rate limit exceeded")
+                completion(.failure(.rateLimitExceeded))
+            } else {
+                print("❌ GitHubClient: Forbidden")
+                completion(.failure(.authenticationError))
+            }
+            return
+        case 422:
+            print("❌ GitHubClient: Invalid search query")
+            completion(.failure(.apiError("Invalid search query")))
+            return
+        default:
+            print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+            completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
+            return
+        }
+        
+        guard let data = data else {
+            print("❌ GitHubClient: No data received")
+            completion(.failure(.invalidResponse))
+            return
+        }
+        
+        print("🔧 GitHubClient: Received \(data.count) bytes of search data")
+        
+        do {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            
+            let searchResponse = try decoder.decode(RepositorySearchResponse.self, from: data)
+            print("✅ GitHubClient: Successfully decoded \(searchResponse.items.count) repositories from search")
+            completion(.success(searchResponse))
+        } catch {
+            print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+            
+            // Try to provide more specific error information
+            if let decodingError = error as? DecodingError {
+                print("❌ GitHubClient: Detailed decoding error: \(decodingError)")
+            }
+            
+            completion(.failure(.decodingError(error.localizedDescription)))
+        }
+    }
+    
     
     // MARK: - Helper Methods
     
