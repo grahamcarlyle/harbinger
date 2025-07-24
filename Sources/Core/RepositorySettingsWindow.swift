@@ -86,10 +86,10 @@ public class RepositorySettingsWindow: NSWindowController {
         tabView.delegate = self
         mainStack.addArrangedSubview(tabView)
         
-        // Setup all tabs
+        // Setup all tabs - Monitored first as it's most relevant and loads fastest
+        setupMonitoredRepositoriesTab()
         setupPersonalRepositoriesTab()
         setupOrganizationsTab()
-        setupMonitoredRepositoriesTab()
         setupPublicSearchTab()
         
         // Bottom buttons

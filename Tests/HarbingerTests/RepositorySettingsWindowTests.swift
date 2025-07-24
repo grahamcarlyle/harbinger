@@ -554,6 +554,42 @@ final class RepositorySettingsWindowTests: XCTestCase {
         }
     }
 
+    func testTabOrder() {
+        guard let contentView = settingsWindow.window?.contentView,
+              let tabView = findTabView(in: contentView) else {
+            XCTFail("Could not find tab view")
+            return
+        }
+        
+        XCTAssertEqual(tabView.numberOfTabViewItems, 4, "Should have 4 tabs")
+        
+        // Verify tab order: Monitored, Personal, Organizations, Public Search
+        let expectedTabOrder = [
+            ("monitored", "Monitored"),
+            ("personal", "Personal"), 
+            ("organizations", "Organizations"),
+            ("searchtest", "Public Search")
+        ]
+        
+        for (index, (expectedId, expectedLabel)) in expectedTabOrder.enumerated() {
+            let tabItem = tabView.tabViewItem(at: index)
+            let actualId = tabItem.identifier as? String
+            let actualLabel = tabItem.label
+            
+            XCTAssertEqual(actualId, expectedId, "Tab at index \(index) should have identifier '\(expectedId)'")
+            XCTAssertEqual(actualLabel, expectedLabel, "Tab at index \(index) should have label '\(expectedLabel)'")
+            
+            print("✅ Tab \(index): '\(actualLabel)' (\(actualId ?? "nil"))")
+        }
+        
+        // Verify that monitored tab is selected by default (first tab)
+        let selectedTabId = tabView.selectedTabViewItem?.identifier as? String
+        print("✅ Default selected tab: '\(selectedTabId ?? "nil")'")
+        
+        // The first tab should be selected by default
+        XCTAssertEqual(selectedTabId, "monitored", "Monitored tab should be selected by default as the first tab")
+    }
+
     func testPublicSearchTabHasSearchField() {
         // Switch to the search tab
         switchToTab(identifier: "searchtest")
