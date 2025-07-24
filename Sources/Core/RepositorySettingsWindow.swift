@@ -694,7 +694,17 @@ public class RepositorySettingsWindow: NSWindowController {
                     if organizations.isEmpty {
                         self?.organizationsPopUp.addItem(withTitle: "No organizations")
                         self?.organizationsPopUp.isEnabled = false
+                    } else if organizations.count == 1 {
+                        // Auto-select single organization for better UX
+                        let singleOrg = organizations[0]
+                        self?.organizationsPopUp.addItem(withTitle: singleOrg.login)
+                        self?.organizationsPopUp.selectItem(at: 0)
+                        self?.organizationsPopUp.isEnabled = true
+                        
+                        // Automatically load repositories for the single organization
+                        self?.loadOrganizationRepositories(for: singleOrg.login)
                     } else {
+                        // Multiple organizations - show dropdown with selection required
                         self?.organizationsPopUp.addItem(withTitle: "Select organization...")
                         for org in organizations {
                             self?.organizationsPopUp.addItem(withTitle: org.login)
@@ -781,14 +791,27 @@ public class RepositorySettingsWindow: NSWindowController {
     // Organizations Tab Actions
     @objc private func organizationChanged() {
         let selectedIndex = organizationsPopUp.indexOfSelectedItem
-        guard selectedIndex > 0, selectedIndex <= userOrganizations.count else {
-            selectedOrgRepositories = []
-            orgTableView.reloadData()
-            return
-        }
         
-        let selectedOrg = userOrganizations[selectedIndex - 1]
-        loadOrganizationRepositories(for: selectedOrg.login)
+        // Handle different organization selection scenarios
+        if userOrganizations.count == 1 {
+            // Single organization case - selectedIndex 0 is the organization
+            guard selectedIndex == 0 else {
+                selectedOrgRepositories = []
+                orgTableView.reloadData()
+                return
+            }
+            let selectedOrg = userOrganizations[0]
+            loadOrganizationRepositories(for: selectedOrg.login)
+        } else {
+            // Multiple organizations case - selectedIndex 0 is "Select organization..."
+            guard selectedIndex > 0, selectedIndex <= userOrganizations.count else {
+                selectedOrgRepositories = []
+                orgTableView.reloadData()
+                return
+            }
+            let selectedOrg = userOrganizations[selectedIndex - 1]
+            loadOrganizationRepositories(for: selectedOrg.login)
+        }
     }
     
     @objc private func orgFilterChanged() {
