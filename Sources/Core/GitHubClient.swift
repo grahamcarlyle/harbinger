@@ -82,7 +82,8 @@ public class GitHubClient {
     }
     
     public func getRepositories(completion: @escaping (Result<[Repository], GitHubError>) -> Void) {
-        fetchAllRepositories(url: "\(baseURL)/user/repos", completion: completion)
+        // Use type=owner to get only repositories owned by the authenticated user (not organization repos)
+        fetchAllRepositories(url: "\(baseURL)/user/repos?type=owner", completion: completion)
     }
     
     public func getUserOrganizations(completion: @escaping (Result<[Organization], GitHubError>) -> Void) {
@@ -293,7 +294,8 @@ public class GitHubClient {
             return
         }
         
-        guard let requestUrl = URL(string: "\(url)?per_page=100&sort=updated&page=\(page)") else {
+        let separator = url.contains("?") ? "&" : "?"
+        guard let requestUrl = URL(string: "\(url)\(separator)per_page=100&sort=updated&page=\(page)") else {
             completion(.failure(.invalidURL))
             return
         }
