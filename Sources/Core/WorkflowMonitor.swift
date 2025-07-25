@@ -59,13 +59,21 @@ public struct WorkflowRunSummary {
     public let url: String
     public let commitSha: String
     public let updatedAt: Date
+    public let commitMessage: String?
+    public let commitAuthor: String?
+    public let runAuthor: String?
+    public let createdAt: Date?
     
-    public init(name: String, status: WorkflowRunStatus, url: String, commitSha: String, updatedAt: Date) {
+    public init(name: String, status: WorkflowRunStatus, url: String, commitSha: String, updatedAt: Date, commitMessage: String? = nil, commitAuthor: String? = nil, runAuthor: String? = nil, createdAt: Date? = nil) {
         self.name = name
         self.status = status
         self.url = url
         self.commitSha = commitSha
         self.updatedAt = updatedAt
+        self.commitMessage = commitMessage
+        self.commitAuthor = commitAuthor
+        self.runAuthor = runAuthor
+        self.createdAt = createdAt
     }
     
     public init(from workflowRun: WorkflowRun) {
@@ -73,8 +81,16 @@ public struct WorkflowRunSummary {
         self.status = workflowRun.statusColor
         self.url = workflowRun.htmlUrl
         self.commitSha = workflowRun.headSha
-        // For now, use current date. In the future we could parse the ISO date string
-        self.updatedAt = Date()
+        
+        // Extract commit message and author information
+        self.commitMessage = workflowRun.headCommit.message
+        self.commitAuthor = workflowRun.headCommit.author.name
+        self.runAuthor = workflowRun.actor?.login
+        
+        // Parse ISO date strings
+        let dateFormatter = ISO8601DateFormatter()
+        self.updatedAt = dateFormatter.date(from: workflowRun.updatedAt) ?? Date()
+        self.createdAt = dateFormatter.date(from: workflowRun.createdAt)
     }
     
     public var statusEmoji: String {
@@ -88,6 +104,31 @@ public struct WorkflowRunSummary {
     
     public var shortCommitSha: String {
         return String(commitSha.prefix(7))
+    }
+    
+    public var truncatedCommitMessage: String {
+        guard let message = commitMessage else { return "No commit message" }
+        // Get first line of commit message and truncate if needed
+        let firstLine = message.components(separatedBy: .newlines).first ?? message
+        let maxLength = 50
+        if firstLine.count > maxLength {
+            return String(firstLine.prefix(maxLength)) + "..."
+        }
+        return firstLine
+    }
+    
+    public var formattedTimestamp: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.dateTimeStyle = .named
+        if let created = createdAt {
+            return formatter.localizedString(for: created, relativeTo: Date())
+        } else {
+            return formatter.localizedString(for: updatedAt, relativeTo: Date())
+        }
+    }
+    
+    public var displayAuthor: String {
+        return runAuthor ?? commitAuthor ?? "Unknown"
     }
 }
 

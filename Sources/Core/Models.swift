@@ -171,6 +171,12 @@ public struct WorkflowRun: Codable {
     let htmlUrl: String         // Used for clickable links to GitHub
     let headSha: String         // Used for commit SHA display
     
+    // Additional fields for enhanced menu display
+    let createdAt: String       // Used for timestamp display
+    let updatedAt: String       // Used for updated timestamp display  
+    let headCommit: HeadCommit  // Used for commit message and author display
+    let actor: GitHubUser?      // Used for actor display
+    
     // Commented out unused fields to make decoding more robust
     // let id: Int
     // let headBranch: String
@@ -178,8 +184,6 @@ public struct WorkflowRun: Codable {
     // let event: String
     // let workflowId: Int
     // let url: String
-    // let createdAt: String
-    // let updatedAt: String
     // let runStartedAt: String?
     // let jobsUrl: String
     // let logsUrl: String
@@ -188,11 +192,9 @@ public struct WorkflowRun: Codable {
     // let cancelUrl: String
     // let rerunUrl: String
     // let workflowUrl: String
-    // let headCommit: HeadCommit
     // let repository: WorkflowRepository
     // let headRepository: WorkflowRepository
     // let pullRequests: [PullRequest]?
-    // let actor: GitHubUser?
     // let triggeringActor: GitHubUser?
     // let runAttempt: Int?
     // let referencedWorkflows: [String]?
@@ -264,6 +266,15 @@ public struct HeadCommit: Codable {
 public struct CommitAuthor: Codable {
     let name: String?
     let email: String?
+}
+
+public struct GitHubUser: Codable {
+    let login: String
+    let id: Int
+    let avatarUrl: String?
+    let htmlUrl: String?
+    
+    // Using automatic snake_case conversion
 }
 
 public struct WorkflowRepository: Codable {
@@ -403,23 +414,7 @@ public struct CachedOrganizationData: Codable {
 }
 
 // MARK: - Additional GitHub Models
-
-public struct GitHubUser: Codable {
-    let login: String
-    let id: Int
-    let nodeId: String?
-    let avatarUrl: String?
-    let gravatarId: String?
-    let url: String?
-    let htmlUrl: String?
-    let type: String?
-    let siteAdmin: Bool?
-    
-    // GitHub API returns many more fields for users, but we only need the essential ones
-    // All other fields are ignored during decoding
-    
-    // Using automatic snake_case conversion
-}
+// GitHubUser is defined above with CommitAuthor
 
 public struct PullRequest: Codable {
     let id: Int?

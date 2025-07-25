@@ -1,5 +1,175 @@
 import Cocoa
 
+// MARK: - Custom Menu Item View
+
+class ColoredMenuItemView: NSView {
+    private let titleLabel = NSTextField()
+    private let status: WorkflowRunStatus?
+    private let isHeader: Bool
+    private let isBuildEntry: Bool
+    
+    init(title: String, isHeader: Bool, status: WorkflowRunStatus?, isBuildEntry: Bool = false) {
+        self.status = status
+        self.isHeader = isHeader
+        self.isBuildEntry = isBuildEntry
+        let width = isBuildEntry ? 500 : 350
+        super.init(frame: NSRect(x: 0, y: 0, width: width, height: 24))
+        
+        setupView(with: title)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func setupView(with title: String) {
+        // Configure the label
+        titleLabel.stringValue = title
+        titleLabel.isEditable = false
+        titleLabel.isSelectable = false
+        titleLabel.isBordered = false
+        titleLabel.backgroundColor = NSColor.clear
+        titleLabel.textColor = NSColor.black
+        titleLabel.cell?.wraps = false
+        titleLabel.cell?.isScrollable = true
+        titleLabel.maximumNumberOfLines = 1
+        
+        // Set font based on whether it's a header
+        if isHeader {
+            titleLabel.font = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
+        } else {
+            titleLabel.font = NSFont.menuFont(ofSize: NSFont.systemFontSize)
+            
+            // Handle styled text for build entries
+            if title.contains(" • ") {
+                let attributedString = createStyledAttributedString(from: title)
+                titleLabel.attributedStringValue = attributedString
+            }
+        }
+        
+        addSubview(titleLabel)
+        
+        // Auto-layout constraints
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            titleLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3)
+        ])
+    }
+    
+    private func createStyledAttributedString(from title: String) -> NSAttributedString {
+        let attributedString = NSMutableAttributedString(string: title)
+        
+        // Find the parts to style differently
+        let parts = title.components(separatedBy: " • ")
+        if parts.count >= 4 {
+            let author = parts[1]
+            let timestamp = parts[2]
+            let commitHash = parts[3]
+            
+            // Set default font and color
+            let mainFont = NSFont.menuFont(ofSize: NSFont.systemFontSize)
+            attributedString.addAttribute(.font, value: mainFont, range: NSRange(location: 0, length: attributedString.length))
+            attributedString.addAttribute(.foregroundColor, value: NSColor.black, range: NSRange(location: 0, length: attributedString.length))
+            
+            // Make author, timestamp, and hash smaller but keep black for contrast
+            let smallFont = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
+            let blackColor = NSColor.black
+            
+            let authorRange = (title as NSString).range(of: author)
+            let timestampRange = (title as NSString).range(of: timestamp)
+            let hashRange = (title as NSString).range(of: commitHash)
+            
+            if authorRange.location != NSNotFound {
+                attributedString.addAttribute(.font, value: smallFont, range: authorRange)
+                attributedString.addAttribute(.foregroundColor, value: blackColor, range: authorRange)
+            }
+            if timestampRange.location != NSNotFound {
+                attributedString.addAttribute(.font, value: smallFont, range: timestampRange)
+                attributedString.addAttribute(.foregroundColor, value: blackColor, range: timestampRange)
+            }
+            if hashRange.location != NSNotFound {
+                attributedString.addAttribute(.font, value: smallFont, range: hashRange)
+                attributedString.addAttribute(.foregroundColor, value: blackColor, range: hashRange)
+            }
+        }
+        
+        return attributedString
+    }
+    
+    override func draw(_ dirtyRect: NSRect) {
+        // Fill the entire available space with solid color based on status
+        let backgroundColor: NSColor
+        
+        if let status = status {
+            switch status {
+            case .success:
+                backgroundColor = NSColor.systemGreen
+            case .failure:
+                backgroundColor = NSColor.systemRed
+            case .running:
+                backgroundColor = NSColor.systemYellow
+            case .unknown:
+                backgroundColor = NSColor.systemGray
+            }
+        } else {
+            backgroundColor = NSColor.controlBackgroundColor
+        }
+        
+        backgroundColor.setFill()
+        
+        // Fill the entire bounds including any extra width the menu system provides
+        let fillRect = NSRect(x: 0, y: 0, width: max(bounds.width, frame.width), height: bounds.height)
+        fillRect.fill()
+        
+        super.draw(dirtyRect)
+    }
+    
+    override var intrinsicContentSize: NSSize {
+        let width = isBuildEntry ? 500 : 350
+        return NSSize(width: width, height: 24)
+    }
+    
+    override func resizeSubviews(withOldSize oldSize: NSSize) {
+        super.resizeSubviews(withOldSize: oldSize)
+        // Ensure we redraw when resized to fill any additional width
+        needsDisplay = true
+    }
+    
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        
+        // When added to a menu, expand to fill the available width
+        if let superview = superview {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                let availableWidth = superview.bounds.width
+                if availableWidth > self.bounds.width {
+                    var newFrame = self.frame
+                    newFrame.size.width = availableWidth
+                    self.frame = newFrame
+                }
+            }
+        }
+    }
+    
+    override var frame: NSRect {
+        get {
+            return super.frame
+        }
+        set {
+            // Ensure the frame uses the full width provided by the menu system
+            let minWidth = isBuildEntry ? 500 : 350
+            let newWidth = max(newValue.width, CGFloat(minWidth))
+            let adjustedFrame = NSRect(x: newValue.origin.x, y: newValue.origin.y, width: newWidth, height: newValue.height)
+            super.frame = adjustedFrame
+            needsDisplay = true
+        }
+    }
+}
+
 public class StatusBarManager: NSObject {
     private var statusItem: NSStatusItem?
     private var menu: NSMenu?
@@ -18,7 +188,7 @@ public class StatusBarManager: NSObject {
     private var lastKnownGoodState: Date?
     
     // Status states
-    enum WorkflowStatus {
+    public enum WorkflowStatus: Equatable {
         case unknown
         case passing
         case failing
@@ -247,24 +417,34 @@ public class StatusBarManager: NSObject {
     }
     
     private func addRepositoryStatusToMenu(_ repoStatus: RepositoryWorkflowStatus) {
-        // Repository header
-        let repoItem = NSMenuItem(title: "📁 \(repoStatus.repository.displayName)", action: nil, keyEquivalent: "")
-        repoItem.isEnabled = false
+        // Repository header with just the name and icon - clickable to open repo
+        let repoTitle = "📁 \(repoStatus.repository.displayName)"
+        let repoItem = createHeaderMenuItem(title: repoTitle, action: #selector(openRepositoryURL(_:)), url: repoStatus.repository.url, status: repoStatus.overallStatus)
         menu?.addItem(repoItem)
         
-        // Overall status
-        let statusItem = NSMenuItem(title: "   \(repoStatus.statusDescription)", action: nil, keyEquivalent: "")
-        statusItem.isEnabled = false
-        menu?.addItem(statusItem)
+        // Group workflows by name to show recent runs for each
+        let workflowGroups = Dictionary(grouping: repoStatus.workflows) { $0.name }
+        let sortedWorkflowNames = workflowGroups.keys.sorted()
         
-        // Recent workflows (show up to 3)
-        let recentWorkflows = Array(repoStatus.workflows.prefix(3))
-        for workflow in recentWorkflows {
-            let workflowTitle = "   \(workflow.statusEmoji) \(workflow.name) (\(workflow.shortCommitSha))"
-            let workflowItem = NSMenuItem(title: workflowTitle, action: #selector(openWorkflowURL(_:)), keyEquivalent: "")
-            workflowItem.target = self
-            workflowItem.representedObject = workflow.url
+        for workflowName in sortedWorkflowNames {
+            guard let workflows = workflowGroups[workflowName] else { continue }
+            
+            // Workflow name header - clickable to open workflow page
+            let mostRecentWorkflow = workflows.first!
+            let workflowTitle = "  \(mostRecentWorkflow.statusEmoji) \(workflowName)"
+            let workflowURL = generateWorkflowURL(repositoryURL: repoStatus.repository.url, workflowName: workflowName)
+            let workflowItem = createHeaderMenuItem(title: workflowTitle, action: #selector(openWorkflowURL(_:)), url: workflowURL, status: mostRecentWorkflow.status)
             menu?.addItem(workflowItem)
+            
+            // Show up to 3 most recent runs for this workflow
+            let recentRuns = Array(workflows.prefix(3))
+            for run in recentRuns {
+                let runTitle = createBuildMenuItemTitle(for: run)
+                let runItem = createStyledMenuItem(title: runTitle, action: #selector(openWorkflowURL(_:)), status: run.status, isBuildEntry: true)
+                runItem.target = self
+                runItem.representedObject = run.url
+                menu?.addItem(runItem)
+            }
         }
         
         // Show "View on GitHub" option
@@ -274,20 +454,71 @@ public class StatusBarManager: NSObject {
         menu?.addItem(viewItem)
     }
     
+    private func createBuildMenuItemTitle(for run: WorkflowRunSummary) -> String {
+        return "    \(run.truncatedCommitMessage) • \(run.displayAuthor) • \(run.formattedTimestamp) • \(run.shortCommitSha)"
+    }
+    
+    private func createHeaderMenuItem(title: String, action: Selector? = nil, url: String? = nil, status: WorkflowRunStatus? = nil) -> NSMenuItem {
+        let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
+        
+        if action != nil {
+            item.target = self
+            item.representedObject = url
+        }
+        
+        // Create custom view for solid background - use wider width for headers
+        let customView = ColoredMenuItemView(title: title, isHeader: true, status: status, isBuildEntry: true)
+        item.view = customView
+        
+        return item
+    }
+    
+    private func generateWorkflowURL(repositoryURL: String, workflowName: String) -> String {
+        // Convert repository URL to workflows URL
+        // Example: https://github.com/owner/repo -> https://github.com/owner/repo/actions/workflows
+        let workflowsURL = "\(repositoryURL)/actions/workflows"
+        
+        // GitHub workflows can be accessed by name, but the exact URL structure
+        // depends on the workflow file name. Since we don't have the exact .yml filename,
+        // we'll link to the workflows overview page for this repository
+        return workflowsURL
+    }
+    
+    private func createStyledMenuItem(title: String, action: Selector?, status: WorkflowRunStatus, isBuildEntry: Bool = false) -> NSMenuItem {
+        let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
+        
+        // Create custom view for solid background
+        let customView = ColoredMenuItemView(title: title, isHeader: false, status: status, isBuildEntry: isBuildEntry)
+        item.view = customView
+        
+        return item
+    }
+    
     private func updateStatusIcon(_ status: WorkflowStatus) {
+        debugger.log(.state, "Updating status icon", context: ["newStatus": "\(status)", "previousStatus": "\(currentStatus)"])
+        
         currentStatus = status
         
-        guard let button = statusItem?.button else { return }
+        guard let button = statusItem?.button else { 
+            debugger.log(.warning, "Cannot update status icon - status item button is nil")
+            return 
+        }
         
         // Create colored circle icons
         let image = createStatusIcon(for: status)
         button.image = image
         
+        debugger.log(.state, "Status icon image updated", context: [
+            "status": "\(status)",
+            "imageSize": "\(image.size)",
+            "isTemplate": "\(image.isTemplate)"
+        ])
+        
         // Update tooltip
         button.toolTip = getTooltipText(for: status)
     }
     
-    private func createStatusIcon(for status: WorkflowStatus) -> NSImage {
+    public func createStatusIcon(for status: WorkflowStatus) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size)
         
@@ -748,7 +979,21 @@ extension StatusBarManager: WorkflowMonitorDelegate {
                 internalStatus = .unknown
             }
             
+            self.debugger.log(.state, "Converting status for icon update", context: ["input": "\(status)", "internal": "\(internalStatus)"])
+            
+            // Update the status icon
             self.updateStatusIcon(internalStatus)
+            
+            // Verify the icon was actually updated
+            if let button = self.statusItem?.button, let currentImage = button.image {
+                self.debugger.log(.state, "Status icon updated", context: [
+                    "imageSize": "\(currentImage.size)",
+                    "isTemplate": "\(currentImage.isTemplate)",
+                    "representations": "\(currentImage.representations.count)"
+                ])
+            } else {
+                self.debugger.log(.warning, "Status icon update failed - button or image is nil")
+            }
             
             // Update tooltip with overall status
             if let button = self.statusItem?.button {
