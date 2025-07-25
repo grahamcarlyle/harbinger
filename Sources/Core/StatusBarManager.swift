@@ -7,6 +7,8 @@ class ColoredMenuItemView: NSView {
     private let status: WorkflowRunStatus?
     private let isHeader: Bool
     private let isBuildEntry: Bool
+    private weak var menuItem: NSMenuItem?
+    private var isHovered: Bool = false
     
     init(title: String, isHeader: Bool, status: WorkflowRunStatus?, isBuildEntry: Bool = false) {
         self.status = status
@@ -16,6 +18,11 @@ class ColoredMenuItemView: NSView {
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: 24))
         
         setupView(with: title)
+        setupClickHandling()
+    }
+    
+    func setMenuItem(_ item: NSMenuItem) {
+        self.menuItem = item
     }
     
     required init?(coder: NSCoder) {
@@ -33,6 +40,9 @@ class ColoredMenuItemView: NSView {
         titleLabel.cell?.wraps = false
         titleLabel.cell?.isScrollable = true
         titleLabel.maximumNumberOfLines = 1
+        
+        // Add subtle visual hint for clickability
+        titleLabel.toolTip = "Click to open in browser"
         
         // Set font based on whether it's a header
         if isHeader {
@@ -57,6 +67,62 @@ class ColoredMenuItemView: NSView {
             titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
             titleLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3)
         ])
+    }
+    
+    private func setupClickHandling() {
+        // Add click gesture recognizer
+        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
+        addGestureRecognizer(clickGesture)
+        
+        // Set up tracking area for hover effects - will be updated in updateTrackingAreas
+        updateTrackingAreas()
+    }
+    
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        
+        // Remove existing tracking areas
+        for trackingArea in trackingAreas {
+            removeTrackingArea(trackingArea)
+        }
+        
+        // Add new tracking area that covers the entire view
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+    }
+    
+    @objc private func handleClick() {
+        // Trigger the menu item's action
+        if let menuItem = menuItem,
+           let target = menuItem.target,
+           let action = menuItem.action {
+            _ = target.perform(action, with: menuItem)
+        }
+    }
+    
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        isHovered = true
+        NSCursor.pointingHand.push()
+        
+        // Force immediate redraw
+        setNeedsDisplay(bounds)
+        displayIfNeeded()
+    }
+    
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        isHovered = false
+        NSCursor.pop()
+        
+        // Force immediate redraw
+        setNeedsDisplay(bounds)
+        displayIfNeeded()
     }
     
     private func createStyledAttributedString(from title: String) -> NSAttributedString {
@@ -101,7 +167,7 @@ class ColoredMenuItemView: NSView {
     
     override func draw(_ dirtyRect: NSRect) {
         // Fill the entire available space with solid color based on status
-        let backgroundColor: NSColor
+        var backgroundColor: NSColor
         
         if let status = status {
             switch status {
@@ -118,11 +184,36 @@ class ColoredMenuItemView: NSView {
             backgroundColor = NSColor.controlBackgroundColor
         }
         
+        // Apply hover effect - make colors slightly lighter/more prominent
+        if isHovered {
+            backgroundColor = backgroundColor.blended(withFraction: 0.2, of: NSColor.white) ?? backgroundColor
+        }
+        
         backgroundColor.setFill()
         
         // Fill the entire bounds including any extra width the menu system provides
         let fillRect = NSRect(x: 0, y: 0, width: max(bounds.width, frame.width), height: bounds.height)
         fillRect.fill()
+        
+        // Add subtle visual indicators for clickability
+        let indicatorColor = NSColor.black.withAlphaComponent(0.1)
+        indicatorColor.setStroke()
+        
+        // Add a subtle left border to indicate clickable items
+        let leftBorder = NSBezierPath()
+        leftBorder.move(to: NSPoint(x: 0, y: 0))
+        leftBorder.line(to: NSPoint(x: 0, y: fillRect.height))
+        leftBorder.lineWidth = 2.0
+        leftBorder.stroke()
+        
+        // Add subtle border on hover for additional clickable indication
+        if isHovered {
+            let borderColor = NSColor.controlAccentColor.withAlphaComponent(0.8)
+            borderColor.setStroke()
+            let borderPath = NSBezierPath(rect: fillRect)
+            borderPath.lineWidth = 1.0
+            borderPath.stroke()
+        }
         
         super.draw(dirtyRect)
     }
@@ -417,6 +508,11 @@ public class StatusBarManager: NSObject {
     }
     
     private func addRepositoryStatusToMenu(_ repoStatus: RepositoryWorkflowStatus) {
+        // Add separator before each repository group (except the first one)
+        if let menu = menu, menu.items.count > 1 && menu.items.contains(where: { $0.view is ColoredMenuItemView }) {
+            menu.addItem(NSMenuItem.separator())
+        }
+        
         // Repository header with just the name and icon - clickable to open repo
         let repoTitle = "📁 \(repoStatus.repository.displayName)"
         let repoItem = createHeaderMenuItem(title: repoTitle, action: #selector(openRepositoryURL(_:)), url: repoStatus.repository.url, status: repoStatus.overallStatus)
@@ -431,7 +527,7 @@ public class StatusBarManager: NSObject {
             
             // Workflow name header - clickable to open workflow page
             let mostRecentWorkflow = workflows.first!
-            let workflowTitle = "  \(mostRecentWorkflow.statusEmoji) \(workflowName)"
+            let workflowTitle = "    \(mostRecentWorkflow.statusEmoji) \(workflowName)"
             let workflowURL = generateWorkflowURL(repositoryURL: repoStatus.repository.url, workflowName: workflowName)
             let workflowItem = createHeaderMenuItem(title: workflowTitle, action: #selector(openWorkflowURL(_:)), url: workflowURL, status: mostRecentWorkflow.status)
             menu?.addItem(workflowItem)
@@ -447,15 +543,10 @@ public class StatusBarManager: NSObject {
             }
         }
         
-        // Show "View on GitHub" option
-        let viewItem = NSMenuItem(title: "   → View on GitHub", action: #selector(openRepositoryURL(_:)), keyEquivalent: "")
-        viewItem.target = self
-        viewItem.representedObject = repoStatus.repository.url
-        menu?.addItem(viewItem)
     }
     
     private func createBuildMenuItemTitle(for run: WorkflowRunSummary) -> String {
-        return "    \(run.truncatedCommitMessage) • \(run.displayAuthor) • \(run.formattedTimestamp) • \(run.shortCommitSha)"
+        return "        \(run.truncatedCommitMessage) • \(run.displayAuthor) • \(run.formattedTimestamp) • \(run.shortCommitSha)"
     }
     
     private func createHeaderMenuItem(title: String, action: Selector? = nil, url: String? = nil, status: WorkflowRunStatus? = nil) -> NSMenuItem {
@@ -468,20 +559,18 @@ public class StatusBarManager: NSObject {
         
         // Create custom view for solid background - use wider width for headers
         let customView = ColoredMenuItemView(title: title, isHeader: true, status: status, isBuildEntry: true)
+        customView.setMenuItem(item)
         item.view = customView
         
         return item
     }
     
     private func generateWorkflowURL(repositoryURL: String, workflowName: String) -> String {
-        // Convert repository URL to workflows URL
-        // Example: https://github.com/owner/repo -> https://github.com/owner/repo/actions/workflows
-        let workflowsURL = "\(repositoryURL)/actions/workflows"
-        
-        // GitHub workflows can be accessed by name, but the exact URL structure
-        // depends on the workflow file name. Since we don't have the exact .yml filename,
-        // we'll link to the workflows overview page for this repository
-        return workflowsURL
+        // Generate URL to filter workflow runs by workflow name
+        // GitHub uses query parameters to filter by workflow: workflow%3A"workflow-name"
+        let encodedWorkflowName = workflowName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? workflowName
+        let workflowURL = "\(repositoryURL)/actions?query=workflow%3A%22\(encodedWorkflowName)%22"
+        return workflowURL
     }
     
     private func createStyledMenuItem(title: String, action: Selector?, status: WorkflowRunStatus, isBuildEntry: Bool = false) -> NSMenuItem {
@@ -489,6 +578,7 @@ public class StatusBarManager: NSObject {
         
         // Create custom view for solid background
         let customView = ColoredMenuItemView(title: title, isHeader: false, status: status, isBuildEntry: isBuildEntry)
+        customView.setMenuItem(item)
         item.view = customView
         
         return item
