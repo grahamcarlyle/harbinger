@@ -55,7 +55,7 @@ struct GitHubOAuthConfig {
     
     static var isConfigured: Bool {
         let token = accessToken
-        let configured = token != nil && !token!.isEmpty
+        let configured = token != nil && !token!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         StatusBarDebugger.shared.log(.lifecycle, "Checking if GitHub is configured", 
                                    context: ["configured": configured, "hasToken": token != nil])
         return configured
