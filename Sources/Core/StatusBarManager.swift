@@ -2,15 +2,16 @@ import Cocoa
 
 // MARK: - Custom Menu Item View
 
-class ColoredMenuItemView: NSView {
+public class ColoredMenuItemView: NSView {
     private let titleLabel = NSTextField()
     private let status: WorkflowRunStatus?
     private let isHeader: Bool
     private let isBuildEntry: Bool
     private weak var menuItem: NSMenuItem?
-    private var isHovered: Bool = false
+    public private(set) var isHovered: Bool = false
     
-    init(title: String, isHeader: Bool, status: WorkflowRunStatus?, isBuildEntry: Bool = false) {
+    
+    public init(title: String, isHeader: Bool, status: WorkflowRunStatus?, isBuildEntry: Bool = false) {
         self.status = status
         self.isHeader = isHeader
         self.isBuildEntry = isBuildEntry
@@ -21,7 +22,7 @@ class ColoredMenuItemView: NSView {
         setupClickHandling()
     }
     
-    func setMenuItem(_ item: NSMenuItem) {
+    public func setMenuItem(_ item: NSMenuItem) {
         self.menuItem = item
     }
     
@@ -78,7 +79,7 @@ class ColoredMenuItemView: NSView {
         updateTrackingAreas()
     }
     
-    override func updateTrackingAreas() {
+    public override func updateTrackingAreas() {
         super.updateTrackingAreas()
         
         // Remove existing tracking areas
@@ -105,20 +106,18 @@ class ColoredMenuItemView: NSView {
         }
     }
     
-    override func mouseEntered(with event: NSEvent) {
+    public override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
         isHovered = true
-        NSCursor.pointingHand.push()
         
         // Force immediate redraw
         setNeedsDisplay(bounds)
         displayIfNeeded()
     }
     
-    override func mouseExited(with event: NSEvent) {
+    public override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         isHovered = false
-        NSCursor.pop()
         
         // Force immediate redraw
         setNeedsDisplay(bounds)
@@ -165,7 +164,7 @@ class ColoredMenuItemView: NSView {
         return attributedString
     }
     
-    override func draw(_ dirtyRect: NSRect) {
+    public override func draw(_ dirtyRect: NSRect) {
         // Fill the entire available space with solid color based on status
         var backgroundColor: NSColor
         
@@ -218,19 +217,20 @@ class ColoredMenuItemView: NSView {
         super.draw(dirtyRect)
     }
     
-    override var intrinsicContentSize: NSSize {
+    public override var intrinsicContentSize: NSSize {
         let width = isBuildEntry ? 500 : 350
         return NSSize(width: width, height: 24)
     }
     
-    override func resizeSubviews(withOldSize oldSize: NSSize) {
+    public override func resizeSubviews(withOldSize oldSize: NSSize) {
         super.resizeSubviews(withOldSize: oldSize)
         // Ensure we redraw when resized to fill any additional width
         needsDisplay = true
     }
     
-    override func viewDidMoveToSuperview() {
+    public override func viewDidMoveToSuperview() {
         super.viewDidMoveToSuperview()
+        
         
         // When added to a menu, expand to fill the available width
         if let superview = superview {
@@ -246,7 +246,7 @@ class ColoredMenuItemView: NSView {
         }
     }
     
-    override var frame: NSRect {
+    public override var frame: NSRect {
         get {
             return super.frame
         }
