@@ -1452,14 +1452,8 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
         
         switch identifier {
         case "name":
-            var nameText = repository.fullName
-            
-            // Add loading indicator for pending repositories
-            if isPending {
-                nameText += " (checking workflows...)"
-            }
-            
-            textField.stringValue = nameText
+            // Repository name should always be clean - workflow status is shown in the workflows column
+            textField.stringValue = repository.fullName
             textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
             textField.textColor = baseTextColor
         case "visibility":
@@ -1532,14 +1526,8 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
         
         switch identifier {
         case "name":
-            var nameText = repository.fullName
-            
-            // Add loading indicator for pending repositories
-            if isPending {
-                nameText += " (checking workflows...)"
-            }
-            
-            textField.stringValue = nameText
+            // Repository name should always be clean - workflow status is shown in the workflows column
+            textField.stringValue = repository.fullName
             textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
             textField.textColor = baseTextColor
         case "description":
