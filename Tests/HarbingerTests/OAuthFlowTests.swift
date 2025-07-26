@@ -3,10 +3,35 @@ import XCTest
 
 final class OAuthFlowTests: XCTestCase {
     
+    private var originalKeychainService: KeychainService!
+    private var mockKeychainService: MockKeychainService!
+    
+    // MARK: - Class Setup (runs before any tests)
+    
+    override class func setUp() {
+        super.setUp()
+        // Inject mock keychain service before any tests run to prevent keychain prompts
+        GitHubOAuthConfig.keychainService = MockKeychainService()
+    }
+    
+    override class func tearDown() {
+        // Restore production keychain service after all tests complete
+        GitHubOAuthConfig.keychainService = ProductionKeychainService()
+        super.tearDown()
+    }
+    
     // MARK: - Setup & Teardown
     
     override func setUp() {
         super.setUp()
+        
+        // Store the original keychain service (will be the mock from class setup)
+        originalKeychainService = GitHubOAuthConfig.keychainService
+        
+        // Inject fresh mock keychain service for this test
+        mockKeychainService = MockKeychainService()
+        GitHubOAuthConfig.keychainService = mockKeychainService
+        
         // Clean up any test tokens
         GitHubOAuthConfig.clearCredentials()
     }
@@ -14,6 +39,10 @@ final class OAuthFlowTests: XCTestCase {
     override func tearDown() {
         // Clean up any test tokens
         GitHubOAuthConfig.clearCredentials()
+        
+        // Restore the original keychain service
+        GitHubOAuthConfig.keychainService = originalKeychainService
+        
         super.tearDown()
     }
     

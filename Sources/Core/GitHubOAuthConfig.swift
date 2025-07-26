@@ -18,9 +18,24 @@ struct GitHubOAuthConfig {
     static let pollingInterval = 5 // seconds
     static let maxPollingAttempts = 120 // 10 minutes max
     
+    // Keychain service dependency injection - lazy to allow test override
+    private static var _keychainService: KeychainService?
+    static var keychainService: KeychainService {
+        get {
+            if let service = _keychainService {
+                return service
+            }
+            _keychainService = ProductionKeychainService()
+            return _keychainService!
+        }
+        set {
+            _keychainService = newValue
+        }
+    }
+    
     // Access token (stored in Keychain)
     static var accessToken: String? {
-        let token = KeychainHelper.retrievePassword(service: "Harbinger", account: "GitHubAccessToken")
+        let token = keychainService.retrievePassword(service: "Harbinger", account: "GitHubAccessToken")
         StatusBarDebugger.shared.log(.lifecycle, "Access token retrieved from Keychain", 
                                    context: ["hasToken": token != nil, "tokenLength": token?.count ?? 0])
         return token
@@ -38,18 +53,18 @@ struct GitHubOAuthConfig {
     static func setAccessToken(_ token: String) {
         StatusBarDebugger.shared.log(.lifecycle, "Storing access token in Keychain", 
                                    context: ["tokenLength": token.count])
-        KeychainHelper.storePassword(service: "Harbinger", account: "GitHubAccessToken", password: token)
+        keychainService.storePassword(service: "Harbinger", account: "GitHubAccessToken", password: token)
         UserDefaults.standard.set(Date(), forKey: "GitHubTokenCreated")
         
         // Verify storage worked
-        let retrievedToken = KeychainHelper.retrievePassword(service: "Harbinger", account: "GitHubAccessToken")
+        let retrievedToken = keychainService.retrievePassword(service: "Harbinger", account: "GitHubAccessToken")
         StatusBarDebugger.shared.log(.lifecycle, "Token storage verification", 
                                    context: ["stored": retrievedToken != nil, "matches": retrievedToken == token])
     }
     
     static func clearCredentials() {
         StatusBarDebugger.shared.log(.lifecycle, "Clearing credentials from Keychain")
-        KeychainHelper.deletePassword(service: "Harbinger", account: "GitHubAccessToken")
+        keychainService.deletePassword(service: "Harbinger", account: "GitHubAccessToken")
         UserDefaults.standard.removeObject(forKey: "GitHubTokenCreated")
     }
     
@@ -83,10 +98,17 @@ struct GitHubOAuthConfig {
     }
 }
 
-// MARK: - Keychain Helper for secure storage
-class KeychainHelper {
+// MARK: - Keychain Service Protocol for dependency injection
+protocol KeychainService {
+    func storePassword(service: String, account: String, password: String)
+    func retrievePassword(service: String, account: String) -> String?
+    func deletePassword(service: String, account: String)
+}
+
+// MARK: - Production Keychain Implementation
+class ProductionKeychainService: KeychainService {
     
-    static func storePassword(service: String, account: String, password: String) {
+    func storePassword(service: String, account: String, password: String) {
         StatusBarDebugger.shared.log(.lifecycle, "KeychainHelper: Storing password", 
                                    context: ["service": service, "account": account, "passwordLength": password.count])
         
@@ -115,7 +137,7 @@ class KeychainHelper {
         }
     }
     
-    static func retrievePassword(service: String, account: String) -> String? {
+    func retrievePassword(service: String, account: String) -> String? {
         StatusBarDebugger.shared.log(.lifecycle, "KeychainHelper: Retrieving password", 
                                    context: ["service": service, "account": account])
         
@@ -147,7 +169,7 @@ class KeychainHelper {
         return nil
     }
     
-    static func deletePassword(service: String, account: String) {
+    func deletePassword(service: String, account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -155,5 +177,50 @@ class KeychainHelper {
         ]
         
         SecItemDelete(query as CFDictionary)
+    }
+}
+
+// MARK: - Mock Keychain Service for testing
+class MockKeychainService: KeychainService {
+    private var storage: [String: String] = [:]
+    
+    func storePassword(service: String, account: String, password: String) {
+        let key = "\(service):\(account)"
+        storage[key] = password
+    }
+    
+    func retrievePassword(service: String, account: String) -> String? {
+        let key = "\(service):\(account)"
+        return storage[key]
+    }
+    
+    func deletePassword(service: String, account: String) {
+        let key = "\(service):\(account)"
+        storage.removeValue(forKey: key)
+    }
+    
+    // Test utility methods
+    func clearAll() {
+        storage.removeAll()
+    }
+    
+    func getAllStoredItems() -> [String: String] {
+        return storage
+    }
+}
+
+// MARK: - Keychain Helper for backward compatibility
+class KeychainHelper {
+    
+    static func storePassword(service: String, account: String, password: String) {
+        GitHubOAuthConfig.keychainService.storePassword(service: service, account: account, password: password)
+    }
+    
+    static func retrievePassword(service: String, account: String) -> String? {
+        return GitHubOAuthConfig.keychainService.retrievePassword(service: service, account: account)
+    }
+    
+    static func deletePassword(service: String, account: String) {
+        GitHubOAuthConfig.keychainService.deletePassword(service: service, account: account)
     }
 }
