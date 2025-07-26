@@ -247,6 +247,12 @@ public class RepositorySettingsWindow: NSWindowController {
         scrollView.hasHorizontalScroller = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         
+        // Add button
+        let addButton = NSButton(title: "Add Selected Repository", target: self, action: #selector(addPersonalRepository))
+        addButton.isEnabled = false
+        addButton.translatesAutoresizingMaskIntoConstraints = false
+        tabContent.addSubview(addButton)
+        
         // Add scroll view directly to tab content with explicit constraints instead of stack view
         tabContent.addSubview(scrollView)
         
@@ -254,23 +260,14 @@ public class RepositorySettingsWindow: NSWindowController {
             scrollView.topAnchor.constraint(equalTo: controlsStack.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(equalToConstant: 400)
+            scrollView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -12),
+            
+            addButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
+            addButton.bottomAnchor.constraint(equalTo: tabContent.bottomAnchor, constant: -16)
         ])
         
         // Force the table to size its columns to fill available width
         personalTableView.sizeLastColumnToFit()
-        
-        // Add button
-        let addButton = NSButton(title: "Add Selected Repository", target: self, action: #selector(addPersonalRepository))
-        addButton.isEnabled = false
-        addButton.translatesAutoresizingMaskIntoConstraints = false
-        tabContent.addSubview(addButton)
-        
-        NSLayoutConstraint.activate([
-            addButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
-            addButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
-            addButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
-        ])
         
         tabAddButtons.append(addButton)
         
@@ -401,11 +398,10 @@ public class RepositorySettingsWindow: NSWindowController {
             scrollView.topAnchor.constraint(equalTo: orgFilterField.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(equalToConstant: 400),
+            scrollView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -12),
             
-            addButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
             addButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
-            addButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+            addButton.bottomAnchor.constraint(equalTo: tabContent.bottomAnchor, constant: -16)
         ])
         
         tabItem.view = tabContent
@@ -536,12 +532,11 @@ public class RepositorySettingsWindow: NSWindowController {
             scrollView.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: tabContent.trailingAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(equalToConstant: 400),
+            scrollView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -12),
             
             // Button positioning (depends on scroll view)  
-            addButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
             addButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
-            addButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
+            addButton.bottomAnchor.constraint(equalTo: tabContent.bottomAnchor, constant: -16)
         ])
         
         // ROBUST FIX: Add explicit tab content constraints to prevent NSTabView sizing issues
@@ -552,7 +547,7 @@ public class RepositorySettingsWindow: NSWindowController {
         DispatchQueue.main.async { [weak self] in
             if let _ = self?.tabView.window {
                 tabContent.widthAnchor.constraint(greaterThanOrEqualToConstant: 950).isActive = true
-                tabContent.heightAnchor.constraint(greaterThanOrEqualToConstant: 500).isActive = true
+                // Remove fixed height constraint to allow flexible layout
             }
         }
     }
