@@ -8,15 +8,17 @@ public struct MonitoredRepository: Codable, Equatable {
     public let fullName: String
     public let isPrivate: Bool
     public let url: String
+    public let description: String?
     public var trackedWorkflows: [String: Bool] // workflow name -> enabled
     public let addedAt: Date
     
-    public init(owner: String, name: String, fullName: String, isPrivate: Bool, url: String, trackedWorkflows: [String: Bool] = [:]) {
+    public init(owner: String, name: String, fullName: String, isPrivate: Bool, url: String, description: String? = nil, trackedWorkflows: [String: Bool] = [:]) {
         self.owner = owner
         self.name = name
         self.fullName = fullName
         self.isPrivate = isPrivate
         self.url = url
+        self.description = description
         self.trackedWorkflows = trackedWorkflows
         self.addedAt = Date()
     }
@@ -28,6 +30,7 @@ public struct MonitoredRepository: Codable, Equatable {
         self.fullName = repository.fullName
         self.isPrivate = repository.private
         self.url = repository.htmlUrl
+        self.description = repository.description
         self.trackedWorkflows = [:] // Start with no specific workflows tracked
         self.addedAt = Date()
     }

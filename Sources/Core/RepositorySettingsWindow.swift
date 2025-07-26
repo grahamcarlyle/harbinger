@@ -599,10 +599,17 @@ public class RepositorySettingsWindow: NSWindowController {
         // Add columns
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameColumn.title = "Repository"
-        nameColumn.width = 350
-        nameColumn.minWidth = 200
+        nameColumn.width = 250
+        nameColumn.minWidth = 150
         nameColumn.resizingMask = .autoresizingMask
         monitoredTableView.addTableColumn(nameColumn)
+        
+        let descriptionColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("description"))
+        descriptionColumn.title = "Description"
+        descriptionColumn.width = 200
+        descriptionColumn.minWidth = 150
+        descriptionColumn.resizingMask = .autoresizingMask
+        monitoredTableView.addTableColumn(descriptionColumn)
         
         let typeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("type"))
         typeColumn.title = "Type"
@@ -1588,6 +1595,11 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
         case "name":
             textField.stringValue = repository.fullName
             textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        case "description":
+            textField.stringValue = repository.description ?? "No description"
+            textField.font = NSFont.systemFont(ofSize: 11)
+            textField.textColor = repository.description != nil ? .labelColor : .secondaryLabelColor
+            textField.lineBreakMode = .byTruncatingTail
         case "type":
             textField.stringValue = repository.isPrivate ? "Private" : "Public"
             textField.font = NSFont.systemFont(ofSize: 11)
