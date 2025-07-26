@@ -268,7 +268,7 @@ public class RepositorySettingsWindow: NSWindowController {
         
         NSLayoutConstraint.activate([
             addButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
-            addButton.centerXAnchor.constraint(equalTo: tabContent.centerXAnchor),
+            addButton.leadingAnchor.constraint(equalTo: tabContent.leadingAnchor, constant: 16),
             addButton.bottomAnchor.constraint(lessThanOrEqualTo: tabContent.bottomAnchor, constant: -16)
         ])
         
