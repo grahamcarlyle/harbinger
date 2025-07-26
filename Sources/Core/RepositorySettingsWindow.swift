@@ -1488,21 +1488,7 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = secondaryTextColor
         case "description":
-            var descriptionText = repository.description ?? "No description"
-            
-            // Add indicators for different states like in search results
-            if isPending {
-                descriptionText = "[Detecting workflows] " + descriptionText
-            } else if !isViable {
-                if repository.archived == true {
-                    descriptionText = "[Archived] " + descriptionText
-                } else if repository.disabled == true {
-                    descriptionText = "[Disabled] " + descriptionText
-                } else {
-                    descriptionText = "[No workflows] " + descriptionText
-                }
-            }
-            
+            let descriptionText = repository.description ?? "No description"
             textField.stringValue = descriptionText
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = repository.description != nil ? baseTextColor : secondaryTextColor
@@ -1555,21 +1541,7 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
             textField.font = NSFont.systemFont(ofSize: 12, weight: .medium)
             textField.textColor = baseTextColor
         case "description":
-            var descriptionText = repository.description ?? "No description"
-            
-            // Add indicators for different states
-            if isPending {
-                descriptionText = "[Detecting workflows] " + descriptionText
-            } else if !isViable {
-                if repository.archived == true {
-                    descriptionText = "[Archived] " + descriptionText
-                } else if repository.disabled == true {
-                    descriptionText = "[Disabled] " + descriptionText
-                } else {
-                    descriptionText = "[No workflows] " + descriptionText
-                }
-            }
-            
+            let descriptionText = repository.description ?? "No description"
             textField.stringValue = descriptionText
             textField.font = NSFont.systemFont(ofSize: 11)
             textField.textColor = repository.description != nil ? baseTextColor : secondaryTextColor
