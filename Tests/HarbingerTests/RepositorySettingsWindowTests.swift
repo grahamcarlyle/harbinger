@@ -10,11 +10,15 @@ final class RepositorySettingsWindowTests: XCTestCase {
         super.setUp()
         settingsWindow = RepositorySettingsWindow()
         
-        // Make the window visible and key to trigger proper layout
-        settingsWindow.showWindow(nil)
-        settingsWindow.window?.makeKey()
+        TestEnvironment.logTestMode()
         
-        // Force initial layout pass
+        if TestEnvironment.shouldRunFullGUITests() {
+            // Full GUI testing - show windows and make them key
+            settingsWindow.showWindow(nil)
+            settingsWindow.window?.makeKey()
+        }
+        
+        // Force initial layout pass (works in both modes)
         settingsWindow.window?.contentView?.layoutSubtreeIfNeeded()
     }
     
@@ -129,7 +133,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         print("\n=== TAB SWITCHING STRESS TEST WITH REALISTIC CONTENT ===")
         
         guard let contentView = settingsWindow.window?.contentView,
-              let tabView = findTabView(in: contentView) else {
+              let _ = findTabView(in: contentView) else {
             XCTFail("Could not find tab view")
             return
         }
@@ -225,7 +229,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         // to see if populated tables affect layout differently than empty ones
         
         guard let contentView = settingsWindow.window?.contentView,
-              let tabView = findTabView(in: contentView) else {
+              let _ = findTabView(in: contentView) else {
             XCTFail("Could not find tab view")
             return
         }
