@@ -23,18 +23,27 @@ swift build
 # Run the app
 swift run
 
-# Run unit tests including integration tests
+# Run unit tests including integration tests (84 tests)
 swift test
 
-# Create app bundle
+# Create app bundle (debug build)
 ./create_app.sh
+
+# Create app bundle (release build)
+./create_app.sh release
 
 # Run app bundle
 open Harbinger.app
 
-# Debug output (when running app bundle)
+# Build release with universal binary
+swift build -c release --arch arm64 --arch x86_64
+
+# Manual debug output (when running app bundle)
 ./Harbinger.app/Contents/MacOS/Harbinger > /tmp/harbinger.log 2>&1 &
 cat /tmp/harbinger.log
+
+# View structured logs (StatusBarDebugger output)
+open ~/Documents/HarbingerLogs
 ```
 
 ## Core Architecture
@@ -54,22 +63,30 @@ cat /tmp/harbinger.log
 - **OAuth Device Flow**: Uses GitHub OAuth Device Flow with user authorization codes
 - **Credential Storage**: 
   - Client ID embedded in app (public, no secret needed)
-  - Access tokens stored in macOS Keychain via `KeychainHelper`
+  - Access tokens stored in macOS Keychain via `KeychainService` protocol
   - No client secrets required for Device Flow
-- **Security**: Uses `KeychainHelper` class for secure token management
+- **Security**: Uses `KeychainService` protocol with dependency injection for secure token management
 
 ### Core Components Structure
-1. **GitHubOAuthConfig**: Central configuration for OAuth credentials and endpoints
-2. **KeychainHelper**: Secure storage utilities for access tokens
+1. **GitHubOAuthConfig**: Central configuration for OAuth credentials and endpoints with KeychainService protocol
+2. **StatusBarDebugger**: Structured logging system with file output and console control
 3. **Current Components** (in Sources/Core/):
-   - `GitHubOAuthConfig.swift` - OAuth configuration and Keychain helpers ✅ **IMPLEMENTED**
+   - `GitHubOAuthConfig.swift` - OAuth configuration with dependency injection for KeychainService ✅ **IMPLEMENTED**
    - `AuthManager.swift` - OAuth Device Flow authentication ✅ **IMPLEMENTED**
    - `StatusBarManager.swift` - Menu bar integration and UI ✅ **IMPLEMENTED**
    - `GitHubClient.swift` - GitHub API communication ✅ **IMPLEMENTED**
    - `Models.swift` - Data structures for workflows and repositories ✅ **IMPLEMENTED**
    - `HarbingerApp.swift` - Main application class ✅ **IMPLEMENTED**
+   - `AppDelegate.swift` - Application delegate with lifecycle management ✅ **IMPLEMENTED**
+   - `StatusBarDebugger.swift` - Centralized logging system ✅ **IMPLEMENTED**
+   - `RepositoryManager.swift` - Repository state management ✅ **IMPLEMENTED**
+   - `RepositorySettingsWindow.swift` - Repository selection UI ✅ **IMPLEMENTED**
+   - `WorkflowDetectionService.swift` - Workflow discovery and caching ✅ **IMPLEMENTED**
+   - `WorkflowMonitor.swift` - Background workflow status monitoring ✅ **IMPLEMENTED**
 4. **Executable** (in Sources/App/):
    - `main.swift` - App entry point and initialization ✅ **IMPLEMENTED**
+5. **Test Utilities** (in Tests/):
+   - `TestEnvironment.swift` - CI detection and test environment utilities ✅ **IMPLEMENTED**
 
 ### Data Flow
 1. User launches Harbinger and clicks "Connect to GitHub"
@@ -102,22 +119,27 @@ cat /tmp/harbinger.log
 - Device Flow configuration for polling and timeouts
 
 ### Security Model
-- Access tokens managed through `KeychainHelper` for secure storage
-- OAuth tokens encrypted in macOS Keychain
+- Access tokens managed through `KeychainService` protocol for secure storage
+- OAuth tokens encrypted in macOS Keychain with `ProductionKeychainService`
+- `MockKeychainService` used for testing to avoid keychain prompts in CI
 - Device Flow eliminates need for client secrets
 - No sensitive data in UserDefaults or plain text storage
 
 ## Development Notes
 
 ### Testing Infrastructure
-- **Unit Tests**: Comprehensive test suite covering API clients, models, and authentication
+- **84 Comprehensive Tests**: Complete test suite covering all major components
 - **XCTest Framework**: Full integration with Swift Package Manager testing
+- **CI Compatible**: Tests run reliably in GitHub Actions with headless environment support
+- **Dependency Injection**: MockKeychainService prevents keychain prompts during testing
 - **OAuth Validation Tests**: Tests validate scopes against GitHub's official list
 - **Client Retention Tests**: Prevents callback deallocation bugs by ensuring network clients are properly retained
 - **Public API Testing**: Tests work against real GitHub repositories without authentication
 - **Mock Testing**: JSON decoding tests with sample GitHub API responses
 - **Performance Testing**: API response time measurements included
 - **Pagination Testing**: Validates multi-page repository fetching and deduplication
+- **GUI Testing**: Repository settings window tests with CI/headless environment detection
+- **Structured Logging**: Clean test output with detailed logs written to files
 
 ### User Experience
 - **Color-coded status**: Green (passing), Red (failing), Yellow (running), White (unknown)
@@ -144,7 +166,7 @@ Users launch Harbinger and click "Connect to GitHub" to start the user-controlle
 - Support for both authenticated and unauthenticated requests
 - Complete data models for workflows, repositories, and workflow runs
 - Robust JSON decoding with automatic snake_case conversion
-- Comprehensive unit test suite with 12 tests covering all major components
+- Comprehensive unit test suite with 84 tests covering all major components
 - Library + executable architecture for better testability
 
 **Phase 3 Complete** ✅
@@ -157,9 +179,51 @@ Users launch Harbinger and click "Connect to GitHub" to start the user-controlle
 - Periodic background refresh with configurable intervals
 - Robust error handling and debugging infrastructure
 
+**Phase 4 Complete** ✅
+- Clean logging system with structured output to files
+- GitHub Actions CI/CD pipeline for automated building and distribution
+- Test infrastructure improvements with CI compatibility
+- Dependency injection for keychain services
+- All print statements converted to structured logging
+- 84 comprehensive tests with clean console output
+
 **Current Features:**
 - ✅ **Complete Repository Coverage**: Fetches all repositories from personal account and organizations (handles 400+ repos with pagination)
 - ✅ **Organization Support**: Full support for organization repositories with proper permissions
 - ✅ **Real-time Monitoring**: Active monitoring of selected repositories with workflow status updates
 - ✅ **Network Client Reliability**: Fixed callback deallocation issues ensuring consistent API responses
-- ✅ **Comprehensive Testing**: OAuth scope validation, pagination testing, and client retention verification
+- ✅ **Comprehensive Testing**: 84 tests with OAuth scope validation, pagination testing, and client retention verification
+- ✅ **CI/CD Pipeline**: GitHub Actions workflow for automated building, testing, and distribution
+- ✅ **Structured Logging**: StatusBarDebugger system with file output and clean console for tests
+- ✅ **Test Infrastructure**: CI-compatible testing with dependency injection and environment detection
+
+## CI/CD and Distribution
+
+### GitHub Actions Workflow
+- **Automated Building**: Triggers on tags (v*) or manual dispatch
+- **Universal Binary**: Builds for both Intel and Apple Silicon Macs
+- **Test Execution**: Runs all 84 tests with structured logging
+- **App Bundle Creation**: Creates proper macOS app bundle with dynamic versioning
+- **Artifact Storage**: Retains build logs and app bundles for 90 days
+- **Release Automation**: Creates GitHub releases with installation instructions
+
+### Build Commands for CI
+```bash
+# Run tests (clean output, logs to files)
+swift test
+
+# Build universal binary for release
+swift build -c release --arch arm64 --arch x86_64
+
+# Create release app bundle
+./create_app.sh release
+
+# Package for distribution
+zip -r Harbinger.zip Harbinger.app
+```
+
+### Log File Locations
+- **Structured Logs**: `~/Documents/HarbingerLogs/harbinger_[timestamp].log`
+- **CI Artifacts**: Collected and uploaded as workflow artifacts
+- **Manual Debug**: Can redirect to `/tmp/harbinger.log` if needed
+- **Console Output**: Disabled during tests for clean output, enabled for normal app usage

@@ -231,14 +231,15 @@ Features:
 - Manual repository entry via text field
 - Real-time repository validation
 
-### Debugging System
-**Files: `StatusBarDebugger.swift`, `StatusBarStateVerifier.swift`, `StatusBarSelfHealer.swift`**
+### Structured Logging System
+**File: `Sources/Core/StatusBarDebugger.swift`**
 
-Comprehensive debugging system that:
-- **Logs** all operations to `~/Documents/HarbingerLogs/`
-- **Verifies** status bar state health
-- **Self-heals** by recreating broken status bar items
-- **Reports** system state for troubleshooting
+Comprehensive logging system that:
+- **Structured Logging** with categories (.lifecycle, .network, .error, .verification, .state)
+- **File Output** to `~/Documents/HarbingerLogs/harbinger_[timestamp].log`
+- **Console Control** automatically disabled during tests for clean output
+- **Context Support** for detailed debugging information
+- **CI Compatible** with environment detection for test runs
 
 ## 7. Data Models
 
@@ -310,7 +311,9 @@ UserDefaults.standard.set(data, forKey: "MonitoredRepositories")
 3. **Most Recent Run Status:** Matches GitHub badge behavior vs. aggregate status
 4. **User-Controlled OAuth:** Eliminates complex polling timers
 5. **Comprehensive Debugging:** Essential for GUI app troubleshooting
-6. **Keychain Security:** Proper credential storage for production use
+6. **Keychain Security:** Protocol-based credential storage with dependency injection for testing
+7. **Structured Logging:** Comprehensive debugging with file output and console control
+8. **CI/CD Integration:** Automated building, testing, and distribution pipeline
 
 ## Threading Model
 
@@ -338,10 +341,22 @@ DispatchQueue.main.async {
 
 ### Commands
 ```bash
-swift build      # Compile
-swift run        # Run in development
-swift test       # Run unit tests
-./create_app.sh  # Create distributable .app bundle
+swift build                                          # Compile debug
+swift build -c release --arch arm64 --arch x86_64   # Universal binary
+swift run                                            # Run in development
+swift test                                           # Run 84 unit tests
+./create_app.sh                                      # Debug app bundle
+./create_app.sh release                              # Release app bundle
 ```
 
-The final deliverable is a `.app` bundle that users can drag to their Applications folder - standard macOS app distribution.
+### CI/CD Pipeline
+**File: `.github/workflows/build.yml`**
+
+GitHub Actions workflow that:
+- **Builds** universal binaries for Intel + Apple Silicon
+- **Tests** all 84 tests with structured logging
+- **Packages** into signed .app bundles
+- **Distributes** via GitHub Releases with automatic versioning
+- **Retains** build logs and artifacts for 90 days
+
+The final deliverable is a `.app` bundle distributed through GitHub Releases - standard for open-source macOS apps.

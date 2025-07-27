@@ -4,10 +4,17 @@
 
 No GitHub App installation needed - just authorize Harbinger directly!
 
-### Step 1: Launch Harbinger
+### Step 1: Download and Launch Harbinger
 
-1. Download and launch the Harbinger app
-2. On first launch, you'll see:
+1. **Download**: Go to the [Releases page](../../releases) and download the latest `Harbinger.zip`
+2. **Extract**: Double-click `Harbinger.zip` to extract `Harbinger.app`
+3. **Install**: Right-click `Harbinger.app` and select "Open" (bypass Gatekeeper warning for unsigned apps)
+4. **Optional**: Move `Harbinger.app` to your Applications folder
+5. **Launch**: The app will appear in your menu bar (no dock icon)
+
+### Step 2: First Launch
+
+On first launch, you'll see:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -25,7 +32,7 @@ No GitHub App installation needed - just authorize Harbinger directly!
 
 3. Click **"Connect to GitHub"**
 
-### Step 2: Device Authorization
+### Step 3: Device Authorization
 
 1. The app will show you a verification code:
 
@@ -51,7 +58,7 @@ No GitHub App installation needed - just authorize Harbinger directly!
 4. Click **"Authorize"** on the GitHub page
 5. Return to Harbinger and click **"Continue"** when you've completed authorization
 
-### Step 3: Repository Selection
+### Step 4: Repository Selection
 
 1. Choose which repositories to monitor:
 
@@ -77,6 +84,23 @@ No GitHub App installation needed - just authorize Harbinger directly!
 
 2. Click **"Start Monitoring"**
 3. Done! The app will start monitoring your workflows
+
+## System Requirements
+
+- **macOS 13.0 or later** (Ventura, Sonoma, Sequoia)
+- **Internet connection** for GitHub API access
+- **GitHub account** with repositories containing Actions workflows
+
+## About Unsigned Apps
+
+Harbinger is currently distributed as an unsigned app for personal use. When you first open it:
+
+1. **Security Warning**: macOS will show "Harbinger cannot be opened because it is from an unidentified developer"
+2. **Solution**: Right-click `Harbinger.app` → Select "Open" → Click "Open" in the dialog
+3. **One-time Setup**: After the first open, you can launch normally from Applications or menu bar
+4. **Why Unsigned**: This avoids Apple Developer Program costs while providing the same functionality
+
+This is normal for many open-source macOS apps and is completely safe for this codebase.
 
 ## What Gets Authorized
 
