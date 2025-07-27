@@ -1,0 +1,88 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop, "feature/*" ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Cache Swift packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          .build
+          ~/Library/Caches/org.swift.swiftpm
+        key: ${{ runner.os }}-swift-${{ hashFiles('Package.swift', 'Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-swift-
+          
+    - name: Run tests
+      run: |
+        echo "🧪 Running test suite..."
+        swift test --verbose
+        echo "✅ All tests completed successfully"
+        
+    - name: Verify build
+      run: |
+        echo "🔨 Verifying debug build..."
+        swift build
+        echo "✅ Debug build completed successfully"
+        
+    - name: Collect test logs on failure
+      if: failure()
+      run: |
+        echo "📋 Collecting test logs after failure..."
+        mkdir -p logs
+        
+        # Check for logs in Documents/HarbingerLogs (where StatusBarDebugger writes)
+        HARBINGER_LOGS="$HOME/Documents/HarbingerLogs"
+        if [ -d "$HARBINGER_LOGS" ]; then
+          cp -r "$HARBINGER_LOGS"/* logs/ 2>/dev/null || true
+          echo "Collected logs from $HARBINGER_LOGS"
+        fi
+        
+        # Also check /tmp for any manual logs
+        if [ -f /tmp/harbinger.log ]; then
+          cp /tmp/harbinger.log logs/harbinger-manual.log
+        fi
+        
+        # Create failure summary
+        echo "Test failure occurred at: $(date)" > logs/failure-summary.txt
+        echo "Git commit: $GITHUB_SHA" >> logs/failure-summary.txt
+        echo "Git ref: $GITHUB_REF" >> logs/failure-summary.txt
+        echo "Runner OS: $RUNNER_OS" >> logs/failure-summary.txt
+        swift --version >> logs/failure-summary.txt
+        
+        echo "✅ Test logs collected"
+        
+    - name: Upload test logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-failure-logs-${{ github.run_number }}
+        path: logs/
+        retention-days: 30
+        
+    - name: Report status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "✅ CI passed - All tests passed and build succeeded"
+        else
+          echo "❌ CI failed - Check test results and build logs"
+          exit 1
+        fi
