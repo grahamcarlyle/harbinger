@@ -8,22 +8,22 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     
     override init() {
         super.init()
-        print("🚀 AppDelegate: Initializing...")
+        StatusBarDebugger.shared.log(.lifecycle, "AppDelegate: Initializing...")
     }
     
     public func applicationDidFinishLaunching(_ aNotification: Notification) {
-        print("🚀 Harbinger is starting...")
+        StatusBarDebugger.shared.log(.lifecycle, "Harbinger is starting...")
         
         // Configure as menu bar only app (no dock icon)
         NSApp.setActivationPolicy(.accessory)
         
         // Initialize the status bar interface
         statusBarManager = StatusBarManager()
-        print("📊 Status bar manager created, app ready...")
+        StatusBarDebugger.shared.log(.lifecycle, "Status bar manager created, app ready...")
     }
     
     public func applicationWillTerminate(_ aNotification: Notification) {
-        print("🔄 Harbinger is shutting down...")
+        StatusBarDebugger.shared.log(.lifecycle, "Harbinger is shutting down...")
         
         // Clean up resources if needed
         statusBarManager = nil
@@ -38,7 +38,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func application(_ application: NSApplication, open urls: [URL]) {
         // Handle URL schemes for future OAuth callback support if needed
         for url in urls {
-            print("📱 AppDelegate: Received URL: \(url)")
+            StatusBarDebugger.shared.log(.lifecycle, "AppDelegate: Received URL", context: ["url": url.absoluteString])
             // Future: Could handle harbinger:// URLs for OAuth callbacks
         }
     }

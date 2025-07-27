@@ -5,7 +5,7 @@ public class HarbingerApp {
     private let appDelegate: AppDelegate
     
     public init() {
-        print("🚀 Starting Harbinger...")
+        StatusBarDebugger.shared.log(.lifecycle, "Starting Harbinger...")
         
         // Create the app delegate
         self.appDelegate = AppDelegate()
@@ -13,11 +13,11 @@ public class HarbingerApp {
         // Set the app delegate
         NSApplication.shared.delegate = appDelegate
         
-        print("📊 App delegate configured, ready to run...")
+        StatusBarDebugger.shared.log(.lifecycle, "App delegate configured, ready to run...")
     }
     
     public func run() {
-        print("🎯 Starting application...")
+        StatusBarDebugger.shared.log(.lifecycle, "Starting application...")
         NSApplication.shared.run()
     }
 }

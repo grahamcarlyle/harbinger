@@ -767,7 +767,7 @@ public class RepositorySettingsWindow: NSWindowController {
             return
         }
         
-        print("🔧 Loading workflows for repository: \(repository.fullName)")
+        StatusBarDebugger.shared.log(.network, "Loading workflows for repository", context: ["repository": repository.fullName])
         
         // Fetch workflows from GitHub API
         gitHubClient.getWorkflows(owner: repository.owner, repo: repository.name) { [weak self] result in
@@ -777,11 +777,11 @@ public class RepositorySettingsWindow: NSWindowController {
                     let activeWorkflows = workflows.workflows.filter { $0.state == "active" }
                     self?.currentWorkflows = activeWorkflows
                     self?.workflowTableView.reloadData()
-                    print("✅ Loaded \(workflows.workflows.count) total workflows for \(repository.fullName)")
-                    print("✅ Filtered to \(activeWorkflows.count) active workflows: \(activeWorkflows.map { $0.name })")
+                    StatusBarDebugger.shared.log(.network, "Loaded total workflows for repository", context: ["count": workflows.workflows.count, "repository": repository.fullName])
+                    StatusBarDebugger.shared.log(.network, "Filtered to active workflows", context: ["count": activeWorkflows.count, "workflows": activeWorkflows.map { $0.name }])
                     
                 case .failure(let error):
-                    print("❌ Failed to load workflows for \(repository.fullName): \(error)")
+                    StatusBarDebugger.shared.log(.error, "Failed to load workflows for repository", context: ["repository": repository.fullName, "error": error.localizedDescription])
                     self?.currentWorkflows = []
                     self?.workflowTableView.reloadData()
                 }
@@ -791,20 +791,20 @@ public class RepositorySettingsWindow: NSWindowController {
     
     private func toggleWorkflowTracking(for workflowName: String) {
         guard let repository = selectedRepository else { 
-            print("❌ No repository selected for workflow toggle")
+            StatusBarDebugger.shared.log(.error, "No repository selected for workflow toggle")
             return 
         }
         
-        print("🔄 Toggling workflow '\(workflowName)' for repository '\(repository.fullName)'")
+        StatusBarDebugger.shared.log(.state, "Toggling workflow for repository", context: ["workflow": workflowName, "repository": repository.fullName])
         
         // Update the repository's workflow tracking
         var updatedRepository = repository
         let currentlyTracked = repository.isWorkflowTracked(workflowName)
-        print("🔄 Current tracking state for '\(workflowName)': \(currentlyTracked)")
+        StatusBarDebugger.shared.log(.state, "Current tracking state for workflow", context: ["workflow": workflowName, "tracked": currentlyTracked])
         
         // Initialize trackedWorkflows if empty (first configuration)
         if updatedRepository.trackedWorkflows.isEmpty {
-            print("🔄 Initializing workflow tracking (was empty)")
+            StatusBarDebugger.shared.log(.state, "Initializing workflow tracking (was empty)")
             // Set all current workflows to their default state (true)
             for workflow in currentWorkflows {
                 updatedRepository.trackedWorkflows[workflow.name] = true
@@ -813,12 +813,12 @@ public class RepositorySettingsWindow: NSWindowController {
         
         // Toggle the specific workflow
         updatedRepository.trackedWorkflows[workflowName] = !currentlyTracked
-        print("🔄 New tracking state for '\(workflowName)': \(!currentlyTracked)")
+        StatusBarDebugger.shared.log(.state, "New tracking state for workflow", context: ["workflow": workflowName, "tracked": !currentlyTracked])
         
         // Save the updated repository
         let success = repositoryManager.setTrackedWorkflows(for: repository.fullName, workflows: updatedRepository.trackedWorkflows)
         guard success else {
-            print("❌ Failed to save workflow configuration for \(repository.fullName)")
+            StatusBarDebugger.shared.log(.error, "Failed to save workflow configuration", context: ["repository": repository.fullName])
             return
         }
         
@@ -832,7 +832,7 @@ public class RepositorySettingsWindow: NSWindowController {
         monitoredTableView.reloadData()
         workflowTableView.reloadData()
         
-        print("🔄 Toggled workflow '\(workflowName)' tracking: \(!currentlyTracked) for \(repository.fullName)")
+        StatusBarDebugger.shared.log(.state, "Toggled workflow tracking", context: ["workflow": workflowName, "tracked": !currentlyTracked, "repository": repository.fullName])
     }
     
     // MARK: - Data Loading Methods
@@ -1306,7 +1306,7 @@ public class RepositorySettingsWindow: NSWindowController {
             repository.isBasicallyViable && WorkflowDetectionService.shared.getCachedWorkflowStatus(for: repository) == nil
         }
         
-        print("🔄 Preloading workflow status for \(pendingRepositories.count) repositories")
+        StatusBarDebugger.shared.log(.network, "Preloading workflow status", context: ["repositoryCount": pendingRepositories.count])
         
         // Trigger workflow detection for all pending repositories
         // The WorkflowDetectionService will handle batching and rate limiting
@@ -1678,15 +1678,15 @@ extension RepositorySettingsWindow: NSTableViewDataSource, NSTableViewDelegate {
     
     @objc private func workflowCheckboxToggled(_ sender: NSButton) {
         let row = sender.tag
-        print("🔄 Workflow checkbox toggled - row: \(row), currentWorkflows.count: \(currentWorkflows.count)")
+        StatusBarDebugger.shared.log(.state, "Workflow checkbox toggled", context: ["row": row, "workflowCount": currentWorkflows.count])
         
         guard row >= 0 && row < currentWorkflows.count else { 
-            print("❌ Invalid row index: \(row) for \(currentWorkflows.count) workflows")
+            StatusBarDebugger.shared.log(.error, "Invalid row index for workflows", context: ["row": row, "workflowCount": currentWorkflows.count])
             return 
         }
         
         let workflow = currentWorkflows[row]
-        print("🔄 Toggling workflow: \(workflow.name)")
+        StatusBarDebugger.shared.log(.state, "Toggling workflow", context: ["workflow": workflow.name])
         toggleWorkflowTracking(for: workflow.name)
     }
     
@@ -1755,15 +1755,15 @@ extension RepositorySettingsWindow: NSTabViewDelegate {
             if let monitored = monitoredRepositories {
                 self?.monitoredRepositories = monitored
                 self?.monitoredTableView.reloadData()
-                print("🧪 Test: Set monitored repositories to \(monitored.count) items")
-                print("🔍 Test: monitoredTableView.numberOfRows after reload = \(self?.monitoredTableView.numberOfRows ?? -1)")
+                StatusBarDebugger.shared.log(.state, "Test: Set monitored repositories", context: ["count": monitored.count])
+                StatusBarDebugger.shared.log(.state, "Test: monitoredTableView.numberOfRows after reload", context: ["rows": self?.monitoredTableView.numberOfRows ?? -1])
             }
             
             if let search = searchResults {
                 self?.searchResults = search
                 self?.searchResultsTable.reloadData()
-                print("🧪 Test: Set search results to \(search.count) items")
-                print("🔍 Test: searchResultsTable.numberOfRows after reload = \(self?.searchResultsTable.numberOfRows ?? -1)")
+                StatusBarDebugger.shared.log(.state, "Test: Set search results", context: ["count": search.count])
+                StatusBarDebugger.shared.log(.state, "Test: searchResultsTable.numberOfRows after reload", context: ["rows": self?.searchResultsTable.numberOfRows ?? -1])
             }
             
             // Force layout update after data changes

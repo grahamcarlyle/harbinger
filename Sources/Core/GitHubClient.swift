@@ -87,12 +87,12 @@ public class GitHubClient {
         
         // Try to load from cache first
         if let cachedRepos = loadRepositoriesFromCache(key: cacheKey) {
-            print("🔄 GitHubClient: Loaded \(cachedRepos.count) personal repositories from cache")
+            StatusBarDebugger.shared.log(.network, "Loaded personal repositories from cache", context: ["count": cachedRepos.count])
             completion(.success(cachedRepos))
             return
         }
         
-        print("🔄 GitHubClient: Cache miss, fetching personal repositories from API")
+        StatusBarDebugger.shared.log(.network, "Cache miss, fetching personal repositories from API")
         // Use type=owner to get only repositories owned by the authenticated user (not organization repos)
         fetchAllRepositories(url: "\(baseURL)/user/repos?type=owner") { [weak self] result in
             switch result {
@@ -110,12 +110,12 @@ public class GitHubClient {
         
         // Try to load from cache first
         if let cachedOrgs = loadOrganizationsFromCache(key: cacheKey) {
-            print("🔄 GitHubClient: Loaded \(cachedOrgs.count) organizations from cache")
+            StatusBarDebugger.shared.log(.network, "Loaded organizations from cache", context: ["count": cachedOrgs.count])
             completion(.success(cachedOrgs))
             return
         }
         
-        print("🔄 GitHubClient: Cache miss, fetching organizations from API")
+        StatusBarDebugger.shared.log(.network, "Cache miss, fetching organizations from API")
         
         guard let accessToken = GitHubOAuthConfig.accessToken else {
             completion(.failure(.noAccessToken))
@@ -132,10 +132,10 @@ public class GitHubClient {
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
         request.setValue("Harbinger/1.0", forHTTPHeaderField: "User-Agent")
         
-        print("🔧 GitHubClient: Fetching user organizations")
+        StatusBarDebugger.shared.log(.network, "Fetching user organizations")
         
         let task = session.dataTask(with: request) { [weak self] data, response, error in
-            print("🔧 GitHubClient: User organizations response received")
+            StatusBarDebugger.shared.log(.network, "User organizations response received")
             self?.handleOrganizationsResponse(data: data, response: response, error: error) { result in
                 switch result {
                 case .success(let organizations):
@@ -147,9 +147,9 @@ public class GitHubClient {
             }
         }
         
-        print("🔧 GitHubClient: Starting user organizations request task")
+        StatusBarDebugger.shared.log(.network, "Starting user organizations request task")
         task.resume()
-        print("🔧 GitHubClient: User organizations request task started")
+        StatusBarDebugger.shared.log(.network, "User organizations request task started")
     }
     
     public func getOrganizationRepositories(org: String, completion: @escaping (Result<[Repository], GitHubError>) -> Void) {
@@ -157,12 +157,12 @@ public class GitHubClient {
         
         // Try to load from cache first
         if let cachedRepos = loadRepositoriesFromCache(key: cacheKey) {
-            print("🔄 GitHubClient: Loaded \(cachedRepos.count) repositories for org \(org) from cache")
+            StatusBarDebugger.shared.log(.network, "Loaded organization repositories from cache", context: ["org": org, "count": cachedRepos.count])
             completion(.success(cachedRepos))
             return
         }
         
-        print("🔄 GitHubClient: Cache miss, fetching repositories for org \(org) from API")
+        StatusBarDebugger.shared.log(.network, "Cache miss, fetching repositories for organization from API", context: ["org": org])
         fetchAllRepositories(url: "\(baseURL)/orgs/\(org)/repos") { [weak self] result in
             switch result {
             case .success(let repositories):
@@ -190,7 +190,7 @@ public class GitHubClient {
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
         request.setValue("Harbinger/1.0", forHTTPHeaderField: "User-Agent")
         
-        print("🔧 GitHubClient: Fetching repository \(owner)/\(repo)")
+        StatusBarDebugger.shared.log(.network, "Fetching repository", context: ["owner": owner, "repo": repo])
         
         session.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -230,7 +230,7 @@ public class GitHubClient {
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
         request.setValue("Harbinger/1.0", forHTTPHeaderField: "User-Agent")
         
-        print("🔧 GitHubClient: Searching public repositories for query: \(query)")
+        StatusBarDebugger.shared.log(.network, "Searching public repositories", context: ["query": query])
         
         session.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -270,13 +270,13 @@ public class GitHubClient {
     private func handleWorkflowRunsResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<WorkflowRunsResponse, GitHubError>) -> Void) {
         
         if let error = error {
-            print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Network error", context: ["description": error.localizedDescription])
             completion(.failure(.networkError(error.localizedDescription)))
             return
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ GitHubClient: Invalid response")
+            StatusBarDebugger.shared.log(.error, "Invalid response")
             completion(.failure(.invalidResponse))
             return
         }
@@ -286,32 +286,32 @@ public class GitHubClient {
         case 200:
             break // Success
         case 401:
-            print("❌ GitHubClient: Authentication failed")
+            StatusBarDebugger.shared.log(.error, "Authentication failed")
             completion(.failure(.authenticationError))
             return
         case 403:
             if let rateLimitRemaining = httpResponse.allHeaderFields["X-RateLimit-Remaining"] as? String,
                rateLimitRemaining == "0" {
-                print("❌ GitHubClient: Rate limit exceeded")
+                StatusBarDebugger.shared.log(.error, "Rate limit exceeded")
                 completion(.failure(.rateLimitExceeded))
             } else {
-                print("❌ GitHubClient: Forbidden")
+                StatusBarDebugger.shared.log(.error, "Forbidden")
                 completion(.failure(.authenticationError))
             }
             return
         case 404:
-            print("❌ GitHubClient: Repository not found")
+            StatusBarDebugger.shared.log(.error, "Repository not found")
             completion(.failure(.apiError("Repository not found")))
             return
         default:
-            print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+            StatusBarDebugger.shared.log(.error, "HTTP error", context: ["statusCode": httpResponse.statusCode])
             completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
             return
         }
         
         guard let data = data else {
-            print("❌ GitHubClient: No data received - HTTP \(httpResponse.statusCode)")
-            print("❌ GitHubClient: Response headers: \(httpResponse.allHeaderFields)")
+            StatusBarDebugger.shared.log(.error, "No data received", context: ["statusCode": httpResponse.statusCode])
+            StatusBarDebugger.shared.log(.error, "Response headers", context: ["headers": httpResponse.allHeaderFields])
             completion(.failure(.invalidResponse))
             return
         }
@@ -330,14 +330,14 @@ public class GitHubClient {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             
             let workflowRuns = try decoder.decode(WorkflowRunsResponse.self, from: data)
-            print("✅ GitHubClient: Successfully decoded \(workflowRuns.workflowRuns.count) workflow runs")
+            StatusBarDebugger.shared.log(.network, "Successfully decoded workflow runs", context: ["count": workflowRuns.workflowRuns.count])
             completion(.success(workflowRuns))
         } catch {
-            print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Decoding error", context: ["description": error.localizedDescription])
             
             // Try to provide more specific error information
             if let decodingError = error as? DecodingError {
-                print("❌ GitHubClient: Detailed decoding error: \(decodingError)")
+                StatusBarDebugger.shared.log(.error, "Detailed decoding error", context: ["error": String(describing: decodingError)])
             }
             
             completion(.failure(.decodingError(error.localizedDescription)))
@@ -361,13 +361,13 @@ public class GitHubClient {
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
         request.setValue("Harbinger/1.0", forHTTPHeaderField: "User-Agent")
         
-        print("🔧 GitHubClient: Fetching repositories page \(page) from \(url)")
+        StatusBarDebugger.shared.log(.network, "Fetching repositories page", context: ["page": page, "url": url])
         
         let task = session.dataTask(with: request) { [weak self] data, response, error in
-            print("🔧 GitHubClient: Repositories page \(page) response received")
+            StatusBarDebugger.shared.log(.network, "Repositories page response received", context: ["page": page])
             
             if let error = error {
-                print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+                StatusBarDebugger.shared.log(.error, "Network error", context: ["description": error.localizedDescription])
                 DispatchQueue.main.async {
                     completion(.failure(.networkError(error.localizedDescription)))
                 }
@@ -375,7 +375,7 @@ public class GitHubClient {
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ GitHubClient: Invalid response")
+                StatusBarDebugger.shared.log(.error, "Invalid response")
                 DispatchQueue.main.async {
                     completion(.failure(.invalidResponse))
                 }
@@ -383,7 +383,7 @@ public class GitHubClient {
             }
             
             guard httpResponse.statusCode == 200 else {
-                print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+                StatusBarDebugger.shared.log(.error, "HTTP error", context: ["statusCode": httpResponse.statusCode])
                 DispatchQueue.main.async {
                     completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
                 }
@@ -391,7 +391,7 @@ public class GitHubClient {
             }
             
             guard let data = data else {
-                print("❌ GitHubClient: No data received")
+                StatusBarDebugger.shared.log(.error, "No data received")
                 DispatchQueue.main.async {
                     completion(.failure(.invalidResponse))
                 }
@@ -402,13 +402,13 @@ public class GitHubClient {
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 let repositories = try decoder.decode([Repository].self, from: data)
-                print("✅ GitHubClient: Successfully decoded \(repositories.count) repositories on page \(page)")
+                StatusBarDebugger.shared.log(.network, "Successfully decoded repositories on page", context: ["count": repositories.count, "page": page])
                 
                 let updatedRepos = allRepos + repositories
                 
                 // If we got fewer than 100 repos, we've reached the end
                 if repositories.count < 100 {
-                    print("📊 GitHubClient: Finished pagination. Total repositories: \(updatedRepos.count)")
+                    StatusBarDebugger.shared.log(.network, "Finished pagination", context: ["totalCount": updatedRepos.count])
                     DispatchQueue.main.async {
                         completion(.success(updatedRepos))
                     }
@@ -418,7 +418,7 @@ public class GitHubClient {
                 }
                 
             } catch {
-                print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+                StatusBarDebugger.shared.log(.error, "Decoding error", context: ["description": error.localizedDescription])
                 DispatchQueue.main.async {
                     completion(.failure(.decodingError(error.localizedDescription)))
                 }
@@ -429,10 +429,10 @@ public class GitHubClient {
     }
     
     private func handleOrganizationsResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<[Organization], GitHubError>) -> Void) {
-        print("🔧 GitHubClient: handleOrganizationsResponse called")
+        StatusBarDebugger.shared.log(.network, "handleOrganizationsResponse called")
         
         if let error = error {
-            print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Network error", context: ["description": error.localizedDescription])
             DispatchQueue.main.async {
                 completion(.failure(.networkError(error.localizedDescription)))
             }
@@ -440,7 +440,7 @@ public class GitHubClient {
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ GitHubClient: Invalid response")
+            StatusBarDebugger.shared.log(.error, "Invalid response")
             DispatchQueue.main.async {
                 completion(.failure(.invalidResponse))
             }
@@ -452,7 +452,7 @@ public class GitHubClient {
         case 200:
             break // Success
         case 401:
-            print("❌ GitHubClient: Authentication failed")
+            StatusBarDebugger.shared.log(.error, "Authentication failed")
             DispatchQueue.main.async {
                 completion(.failure(.authenticationError))
             }
@@ -460,19 +460,19 @@ public class GitHubClient {
         case 403:
             if let rateLimitRemaining = httpResponse.allHeaderFields["X-RateLimit-Remaining"] as? String,
                rateLimitRemaining == "0" {
-                print("❌ GitHubClient: Rate limit exceeded")
+                StatusBarDebugger.shared.log(.error, "Rate limit exceeded")
                 DispatchQueue.main.async {
                     completion(.failure(.rateLimitExceeded))
                 }
             } else {
-                print("❌ GitHubClient: Forbidden")
+                StatusBarDebugger.shared.log(.error, "Forbidden")
                 DispatchQueue.main.async {
                     completion(.failure(.authenticationError))
                 }
             }
             return
         default:
-            print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+            StatusBarDebugger.shared.log(.error, "HTTP error", context: ["statusCode": httpResponse.statusCode])
             DispatchQueue.main.async {
                 completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
             }
@@ -480,7 +480,7 @@ public class GitHubClient {
         }
         
         guard let data = data else {
-            print("❌ GitHubClient: No data received")
+            StatusBarDebugger.shared.log(.error, "No data received")
             DispatchQueue.main.async {
                 completion(.failure(.invalidResponse))
             }
@@ -491,12 +491,12 @@ public class GitHubClient {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let organizations = try decoder.decode([Organization].self, from: data)
-            print("✅ GitHubClient: Successfully decoded \(organizations.count) organizations")
+            StatusBarDebugger.shared.log(.network, "Successfully decoded organizations", context: ["count": organizations.count])
             DispatchQueue.main.async {
                 completion(.success(organizations))
             }
         } catch {
-            print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Decoding error", context: ["description": error.localizedDescription])
             DispatchQueue.main.async {
                 completion(.failure(.decodingError(error.localizedDescription)))
             }
@@ -504,10 +504,10 @@ public class GitHubClient {
     }
     
     private func handleRepositoriesResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<[Repository], GitHubError>) -> Void) {
-        print("🔧 GitHubClient: handleRepositoriesResponse called")
+        StatusBarDebugger.shared.log(.network, "handleRepositoriesResponse called")
         
         if let error = error {
-            print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Network error", context: ["description": error.localizedDescription])
             DispatchQueue.main.async {
                 completion(.failure(.networkError(error.localizedDescription)))
             }
@@ -515,7 +515,7 @@ public class GitHubClient {
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ GitHubClient: Invalid response")
+            StatusBarDebugger.shared.log(.error, "Invalid response")
             DispatchQueue.main.async {
                 completion(.failure(.invalidResponse))
             }
@@ -527,7 +527,7 @@ public class GitHubClient {
         case 200:
             break // Success
         case 401:
-            print("❌ GitHubClient: Authentication failed")
+            StatusBarDebugger.shared.log(.error, "Authentication failed")
             DispatchQueue.main.async {
                 completion(.failure(.authenticationError))
             }
@@ -535,19 +535,19 @@ public class GitHubClient {
         case 403:
             if let rateLimitRemaining = httpResponse.allHeaderFields["X-RateLimit-Remaining"] as? String,
                rateLimitRemaining == "0" {
-                print("❌ GitHubClient: Rate limit exceeded")
+                StatusBarDebugger.shared.log(.error, "Rate limit exceeded")
                 DispatchQueue.main.async {
                     completion(.failure(.rateLimitExceeded))
                 }
             } else {
-                print("❌ GitHubClient: Forbidden")
+                StatusBarDebugger.shared.log(.error, "Forbidden")
                 DispatchQueue.main.async {
                     completion(.failure(.authenticationError))
                 }
             }
             return
         default:
-            print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+            StatusBarDebugger.shared.log(.error, "HTTP error", context: ["statusCode": httpResponse.statusCode])
             DispatchQueue.main.async {
                 completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
             }
@@ -555,7 +555,7 @@ public class GitHubClient {
         }
         
         guard let data = data else {
-            print("❌ GitHubClient: No data received")
+            StatusBarDebugger.shared.log(.error, "No data received")
             DispatchQueue.main.async {
                 completion(.failure(.invalidResponse))
             }
@@ -566,12 +566,12 @@ public class GitHubClient {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let repositories = try decoder.decode([Repository].self, from: data)
-            print("✅ GitHubClient: Successfully decoded \(repositories.count) repositories")
+            StatusBarDebugger.shared.log(.network, "Successfully decoded repositories", context: ["count": repositories.count])
             DispatchQueue.main.async {
                 completion(.success(repositories))
             }
         } catch {
-            print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Decoding error", context: ["description": error.localizedDescription])
             DispatchQueue.main.async {
                 completion(.failure(.decodingError(error.localizedDescription)))
             }
@@ -581,13 +581,13 @@ public class GitHubClient {
     private func handleRepositoryResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<Repository, GitHubError>) -> Void) {
         
         if let error = error {
-            print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Network error", context: ["description": error.localizedDescription])
             completion(.failure(.networkError(error.localizedDescription)))
             return
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ GitHubClient: Invalid response")
+            StatusBarDebugger.shared.log(.error, "Invalid response")
             completion(.failure(.invalidResponse))
             return
         }
@@ -597,31 +597,31 @@ public class GitHubClient {
         case 200:
             break // Success
         case 401:
-            print("❌ GitHubClient: Authentication failed")
+            StatusBarDebugger.shared.log(.error, "Authentication failed")
             completion(.failure(.unauthorized))
             return
         case 403:
             if let rateLimitRemaining = httpResponse.allHeaderFields["X-RateLimit-Remaining"] as? String,
                rateLimitRemaining == "0" {
-                print("❌ GitHubClient: Rate limit exceeded")
+                StatusBarDebugger.shared.log(.error, "Rate limit exceeded")
                 completion(.failure(.rateLimitExceeded))
             } else {
-                print("❌ GitHubClient: Forbidden")
+                StatusBarDebugger.shared.log(.error, "Forbidden")
                 completion(.failure(.unauthorized))
             }
             return
         case 404:
-            print("❌ GitHubClient: Repository not found")
+            StatusBarDebugger.shared.log(.error, "Repository not found")
             completion(.failure(.notFound))
             return
         default:
-            print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+            StatusBarDebugger.shared.log(.error, "HTTP error", context: ["statusCode": httpResponse.statusCode])
             completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
             return
         }
         
         guard let data = data else {
-            print("❌ GitHubClient: No data received")
+            StatusBarDebugger.shared.log(.error, "No data received")
             completion(.failure(.invalidResponse))
             return
         }
@@ -630,10 +630,10 @@ public class GitHubClient {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let repository = try decoder.decode(Repository.self, from: data)
-            print("✅ GitHubClient: Successfully decoded repository \(repository.fullName)")
+            StatusBarDebugger.shared.log(.network, "Successfully decoded repository", context: ["fullName": repository.fullName])
             completion(.success(repository))
         } catch {
-            print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Decoding error", context: ["description": error.localizedDescription])
             completion(.failure(.decodingError(error.localizedDescription)))
         }
     }
@@ -641,13 +641,13 @@ public class GitHubClient {
     private func handleWorkflowsResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<WorkflowsResponse, GitHubError>) -> Void) {
         
         if let error = error {
-            print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Network error", context: ["description": error.localizedDescription])
             completion(.failure(.networkError(error.localizedDescription)))
             return
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ GitHubClient: Invalid response")
+            StatusBarDebugger.shared.log(.error, "Invalid response")
             completion(.failure(.invalidResponse))
             return
         }
@@ -657,31 +657,31 @@ public class GitHubClient {
         case 200:
             break // Success
         case 401:
-            print("❌ GitHubClient: Authentication failed")
+            StatusBarDebugger.shared.log(.error, "Authentication failed")
             completion(.failure(.authenticationError))
             return
         case 403:
             if let rateLimitRemaining = httpResponse.allHeaderFields["X-RateLimit-Remaining"] as? String,
                rateLimitRemaining == "0" {
-                print("❌ GitHubClient: Rate limit exceeded")
+                StatusBarDebugger.shared.log(.error, "Rate limit exceeded")
                 completion(.failure(.rateLimitExceeded))
             } else {
-                print("❌ GitHubClient: Forbidden")
+                StatusBarDebugger.shared.log(.error, "Forbidden")
                 completion(.failure(.authenticationError))
             }
             return
         case 404:
-            print("❌ GitHubClient: Repository not found")
+            StatusBarDebugger.shared.log(.error, "Repository not found")
             completion(.failure(.apiError("Repository not found")))
             return
         default:
-            print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+            StatusBarDebugger.shared.log(.error, "HTTP error", context: ["statusCode": httpResponse.statusCode])
             completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
             return
         }
         
         guard let data = data else {
-            print("❌ GitHubClient: No data received")
+            StatusBarDebugger.shared.log(.error, "No data received")
             completion(.failure(.invalidResponse))
             return
         }
@@ -690,10 +690,10 @@ public class GitHubClient {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let workflows = try decoder.decode(WorkflowsResponse.self, from: data)
-            print("✅ GitHubClient: Successfully decoded \(workflows.workflows.count) workflows")
+            StatusBarDebugger.shared.log(.network, "Successfully decoded workflows", context: ["count": workflows.workflows.count])
             completion(.success(workflows))
         } catch {
-            print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Decoding error", context: ["description": error.localizedDescription])
             completion(.failure(.decodingError(error.localizedDescription)))
         }
     }
@@ -701,13 +701,13 @@ public class GitHubClient {
     private func handleSearchResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<RepositorySearchResponse, GitHubError>) -> Void) {
         
         if let error = error {
-            print("❌ GitHubClient: Network error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Network error", context: ["description": error.localizedDescription])
             completion(.failure(.networkError(error.localizedDescription)))
             return
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ GitHubClient: Invalid response")
+            StatusBarDebugger.shared.log(.error, "Invalid response")
             completion(.failure(.invalidResponse))
             return
         }
@@ -717,31 +717,31 @@ public class GitHubClient {
         case 200:
             break // Success
         case 401:
-            print("❌ GitHubClient: Authentication failed")
+            StatusBarDebugger.shared.log(.error, "Authentication failed")
             completion(.failure(.authenticationError))
             return
         case 403:
             if let rateLimitRemaining = httpResponse.allHeaderFields["X-RateLimit-Remaining"] as? String,
                rateLimitRemaining == "0" {
-                print("❌ GitHubClient: Rate limit exceeded")
+                StatusBarDebugger.shared.log(.error, "Rate limit exceeded")
                 completion(.failure(.rateLimitExceeded))
             } else {
-                print("❌ GitHubClient: Forbidden")
+                StatusBarDebugger.shared.log(.error, "Forbidden")
                 completion(.failure(.authenticationError))
             }
             return
         case 422:
-            print("❌ GitHubClient: Invalid search query")
+            StatusBarDebugger.shared.log(.error, "Invalid search query")
             completion(.failure(.apiError("Invalid search query")))
             return
         default:
-            print("❌ GitHubClient: HTTP error \(httpResponse.statusCode)")
+            StatusBarDebugger.shared.log(.error, "HTTP error", context: ["statusCode": httpResponse.statusCode])
             completion(.failure(.apiError("HTTP \(httpResponse.statusCode)")))
             return
         }
         
         guard let data = data else {
-            print("❌ GitHubClient: No data received")
+            StatusBarDebugger.shared.log(.error, "No data received")
             completion(.failure(.invalidResponse))
             return
         }
@@ -753,14 +753,14 @@ public class GitHubClient {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             
             let searchResponse = try decoder.decode(RepositorySearchResponse.self, from: data)
-            print("✅ GitHubClient: Successfully decoded \(searchResponse.items.count) repositories from search")
+            StatusBarDebugger.shared.log(.network, "Successfully decoded repositories from search", context: ["count": searchResponse.items.count])
             completion(.success(searchResponse))
         } catch {
-            print("❌ GitHubClient: Decoding error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "Decoding error", context: ["description": error.localizedDescription])
             
             // Try to provide more specific error information
             if let decodingError = error as? DecodingError {
-                print("❌ GitHubClient: Detailed decoding error: \(decodingError)")
+                StatusBarDebugger.shared.log(.error, "Detailed decoding error", context: ["error": String(describing: decodingError)])
             }
             
             completion(.failure(.decodingError(error.localizedDescription)))
@@ -796,7 +796,7 @@ public class GitHubClient {
             
             return cachedData.repositories
         } catch {
-            print("⚠️ GitHubClient: Failed to load repository cache for key \(key): \(error)")
+            StatusBarDebugger.shared.log(.warning, "Failed to load repository cache", context: ["key": key, "error": error.localizedDescription])
             userDefaults.removeObject(forKey: key)
             return nil
         }
@@ -808,9 +808,9 @@ public class GitHubClient {
         do {
             let data = try JSONEncoder().encode(cachedData)
             userDefaults.set(data, forKey: key)
-            print("🔄 GitHubClient: Saved \(repositories.count) repositories to cache with key \(key)")
+            StatusBarDebugger.shared.log(.network, "Saved repositories to cache", context: ["count": repositories.count, "key": key])
         } catch {
-            print("⚠️ GitHubClient: Failed to save repository cache for key \(key): \(error)")
+            StatusBarDebugger.shared.log(.warning, "Failed to save repository cache", context: ["key": key, "error": error.localizedDescription])
         }
     }
     
@@ -829,7 +829,7 @@ public class GitHubClient {
             
             return cachedData.organizations
         } catch {
-            print("⚠️ GitHubClient: Failed to load organization cache for key \(key): \(error)")
+            StatusBarDebugger.shared.log(.warning, "Failed to load organization cache", context: ["key": key, "error": error.localizedDescription])
             userDefaults.removeObject(forKey: key)
             return nil
         }
@@ -841,9 +841,9 @@ public class GitHubClient {
         do {
             let data = try JSONEncoder().encode(cachedData)
             userDefaults.set(data, forKey: key)
-            print("🔄 GitHubClient: Saved \(organizations.count) organizations to cache with key \(key)")
+            StatusBarDebugger.shared.log(.network, "Saved organizations to cache", context: ["count": organizations.count, "key": key])
         } catch {
-            print("⚠️ GitHubClient: Failed to save organization cache for key \(key): \(error)")
+            StatusBarDebugger.shared.log(.warning, "Failed to save organization cache", context: ["key": key, "error": error.localizedDescription])
         }
     }
     
@@ -865,6 +865,6 @@ public class GitHubClient {
             }
         }
         
-        print("🔄 GitHubClient: Cleared all repository and organization caches")
+        StatusBarDebugger.shared.log(.network, "Cleared all repository and organization caches")
     }
 }

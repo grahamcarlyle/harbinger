@@ -202,7 +202,7 @@ public class WorkflowMonitor {
             return
         }
         
-        print("🔄 WorkflowMonitor: Refreshing \(repositories.count) repositories...")
+        StatusBarDebugger.shared.log(.network, "Refreshing repositories", context: ["count": repositories.count])
         
         let group = DispatchGroup()
         var newStatusCache: [String: RepositoryWorkflowStatus] = [:]
@@ -223,7 +223,7 @@ public class WorkflowMonitor {
             let overallStatus = self.calculateOverallStatus()
             let statusText = self.generateOverallStatusText()
             
-            print("✅ WorkflowMonitor: Completed refresh - Overall status: \(overallStatus)")
+            StatusBarDebugger.shared.log(.network, "Completed refresh", context: ["overallStatus": "\(overallStatus)"])
             self.delegate?.workflowMonitor(self, didUpdateOverallStatus: overallStatus, statusText: statusText)
         }
     }
@@ -239,12 +239,12 @@ public class WorkflowMonitor {
     // MARK: - Private Methods
     
     private func fetchWorkflowStatus(for repository: MonitoredRepository, completion: @escaping (RepositoryWorkflowStatus) -> Void) {
-        print("🔍 WorkflowMonitor: Fetching workflows for \(repository.fullName)")
+        StatusBarDebugger.shared.log(.network, "Fetching workflows for repository", context: ["repository": repository.fullName])
         
         gitHubClient.getWorkflowRuns(owner: repository.owner, repo: repository.name) { result in
             switch result {
             case .success(let workflowRuns):
-                print("✅ WorkflowMonitor: Fetched \(workflowRuns.workflowRuns.count) workflow runs for \(repository.fullName)")
+                StatusBarDebugger.shared.log(.network, "Fetched workflow runs for repository", context: ["count": workflowRuns.workflowRuns.count, "repository": repository.fullName])
                 
                 // Filter workflow runs based on repository's tracking configuration
                 let filteredRuns = workflowRuns.workflowRuns.filter { workflowRun in
@@ -258,9 +258,9 @@ public class WorkflowMonitor {
                     return repository.isWorkflowTracked(workflowName)
                 }
                 
-                print("🔍 WorkflowMonitor: Filtered to \(filteredRuns.count) tracked workflow runs for \(repository.fullName)")
+                StatusBarDebugger.shared.log(.network, "Filtered to tracked workflow runs for repository", context: ["filteredCount": filteredRuns.count, "repository": repository.fullName])
                 if repository.hasSpecificWorkflowsConfigured {
-                    print("🔍 WorkflowMonitor: Tracking specific workflows: \(repository.trackedWorkflowNames)")
+                    StatusBarDebugger.shared.log(.state, "Tracking specific workflows", context: ["workflows": repository.trackedWorkflowNames, "repository": repository.fullName])
                 }
                 
                 // Get latest workflow runs (limit to recent ones)
@@ -276,7 +276,7 @@ public class WorkflowMonitor {
                 completion(status)
                 
             case .failure(let error):
-                print("❌ WorkflowMonitor: Failed to fetch workflows for \(repository.fullName): \(error.localizedDescription)")
+                StatusBarDebugger.shared.log(.error, "Failed to fetch workflows for repository", context: ["repository": repository.fullName, "error": error.localizedDescription])
                 
                 let status = RepositoryWorkflowStatus(
                     repository: repository,

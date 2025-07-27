@@ -103,7 +103,7 @@ public class WorkflowDetectionService {
                     
                 case .failure(let error):
                     // On error, assume repository has no workflows to be conservative
-                    print("⚠️ WorkflowDetectionService: Failed to check workflows for \(cacheKey): \(error)")
+                    StatusBarDebugger.shared.log(.warning, "Failed to check workflows", context: ["cacheKey": cacheKey, "error": error.localizedDescription])
                     self?.workflowCache[cacheKey] = false  // Conservative approach on error
                     self?.saveCacheToPersistentStorage()
                     completion(false)
@@ -134,7 +134,7 @@ public class WorkflowDetectionService {
     
     private func loadCacheFromPersistentStorage() {
         guard let data = userDefaults.data(forKey: cacheKey) else {
-            print("🔄 WorkflowDetectionService: No persistent cache found")
+            StatusBarDebugger.shared.log(.network, "No persistent cache found")
             return
         }
         
@@ -142,15 +142,15 @@ public class WorkflowDetectionService {
             let cachedData = try JSONDecoder().decode(CachedWorkflowData.self, from: data)
             
             if cachedData.isExpired {
-                print("🔄 WorkflowDetectionService: Persistent cache expired, clearing")
+                StatusBarDebugger.shared.log(.network, "Persistent cache expired, clearing")
                 userDefaults.removeObject(forKey: cacheKey)
                 return
             }
             
             workflowCache = cachedData.workflowStatus
-            print("🔄 WorkflowDetectionService: Loaded \(workflowCache.count) items from persistent cache")
+            StatusBarDebugger.shared.log(.network, "Loaded items from persistent cache", context: ["count": workflowCache.count])
         } catch {
-            print("⚠️ WorkflowDetectionService: Failed to load persistent cache: \(error)")
+            StatusBarDebugger.shared.log(.warning, "Failed to load persistent cache", context: ["error": error.localizedDescription])
             userDefaults.removeObject(forKey: cacheKey)
         }
     }
@@ -161,9 +161,9 @@ public class WorkflowDetectionService {
         do {
             let data = try JSONEncoder().encode(cachedData)
             userDefaults.set(data, forKey: cacheKey)
-            print("🔄 WorkflowDetectionService: Saved \(workflowCache.count) items to persistent cache")
+            StatusBarDebugger.shared.log(.network, "Saved items to persistent cache", context: ["count": workflowCache.count])
         } catch {
-            print("⚠️ WorkflowDetectionService: Failed to save persistent cache: \(error)")
+            StatusBarDebugger.shared.log(.warning, "Failed to save persistent cache", context: ["error": error.localizedDescription])
         }
     }
 }

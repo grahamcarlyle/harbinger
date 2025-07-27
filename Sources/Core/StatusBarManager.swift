@@ -296,7 +296,7 @@ public class StatusBarManager: NSObject {
         debugger.log(.lifecycle, "StatusBarManager initialization started")
         
         // Print log file path for easy access
-        print("📋 Harbinger Debug Log: \(debugger.getLogFilePath())")
+        StatusBarDebugger.shared.log(.menu, "Debug log file path", context: ["path": debugger.getLogFilePath()])
         
         do {
             try setupStatusBar()
@@ -731,7 +731,7 @@ public class StatusBarManager: NSObject {
             pasteboard.declareTypes([.string], owner: nil)
             pasteboard.setString(userCode, forType: .string)
             
-            print("📋 User code copied to clipboard: \(userCode)")
+            StatusBarDebugger.shared.log(.state, "User code copied to clipboard", context: ["code": userCode])
             
             // Show confirmation and re-show dialog
             let copyAlert = NSAlert()
@@ -749,7 +749,7 @@ public class StatusBarManager: NSObject {
             
         case NSApplication.ModalResponse(rawValue: 1003): // Cancel (fourth button)
             authManager.cancelAuthentication()
-            print("🔧 StatusBarManager: Authentication canceled")
+            StatusBarDebugger.shared.log(.lifecycle, "Authentication canceled")
             
         default:
             break
@@ -805,10 +805,10 @@ public class StatusBarManager: NSObject {
     }
     
     @objc private func refresh() {
-        print("Refresh clicked")
+        StatusBarDebugger.shared.log(.menu, "Refresh clicked")
         
         guard GitHubOAuthConfig.isConfigured else {
-            print("❌ No OAuth token available")
+            StatusBarDebugger.shared.log(.error, "No OAuth token available")
             showErrorDialog(message: "Please connect to GitHub first")
             return
         }
@@ -820,27 +820,27 @@ public class StatusBarManager: NSObject {
     @objc private func openWorkflowURL(_ sender: NSMenuItem) {
         guard let urlString = sender.representedObject as? String,
               let url = URL(string: urlString) else {
-            print("❌ Invalid workflow URL")
+            StatusBarDebugger.shared.log(.error, "Invalid workflow URL")
             return
         }
         
-        print("🔗 Opening workflow URL: \(urlString)")
+        StatusBarDebugger.shared.log(.menu, "Opening workflow URL", context: ["url": urlString])
         NSWorkspace.shared.open(url)
     }
     
     @objc private func openRepositoryURL(_ sender: NSMenuItem) {
         guard let urlString = sender.representedObject as? String,
               let url = URL(string: urlString) else {
-            print("❌ Invalid repository URL")
+            StatusBarDebugger.shared.log(.error, "Invalid repository URL")
             return
         }
         
-        print("🔗 Opening repository URL: \(urlString)")
+        StatusBarDebugger.shared.log(.menu, "Opening repository URL", context: ["url": urlString])
         NSWorkspace.shared.open(url)
     }
     
     @objc private func disconnectFromGitHub() {
-        print("Disconnect from GitHub clicked")
+        StatusBarDebugger.shared.log(.menu, "Disconnect from GitHub clicked")
         
         let alert = NSAlert()
         alert.messageText = "Disconnect from GitHub?"
@@ -865,7 +865,7 @@ public class StatusBarManager: NSObject {
             updateStatusIcon(.unknown)
             rebuildMenu()
             
-            print("✅ Disconnected from GitHub")
+            StatusBarDebugger.shared.log(.lifecycle, "Disconnected from GitHub")
         }
     }
     

@@ -84,7 +84,7 @@ public class RepositoryManager {
             let repositories = try JSONDecoder().decode([MonitoredRepository].self, from: data)
             return repositories
         } catch {
-            print("❌ RepositoryManager: Failed to decode repositories: \(error)")
+            StatusBarDebugger.shared.log(.error, "Failed to decode repositories", context: ["error": error.localizedDescription])
             return []
         }
     }
@@ -94,7 +94,7 @@ public class RepositoryManager {
         
         // Check if repository is already being monitored
         if repositories.contains(repository) {
-            print("ℹ️ RepositoryManager: Repository \(repository.displayName) is already being monitored")
+            StatusBarDebugger.shared.log(.warning, "Repository is already being monitored", context: ["repository": repository.displayName])
             return false
         }
         
@@ -128,7 +128,7 @@ public class RepositoryManager {
         var repositories = getMonitoredRepositories()
         
         guard let index = repositories.firstIndex(where: { $0.fullName == repositoryFullName }) else {
-            print("❌ RepositoryManager: Repository \(repositoryFullName) not found for workflow update")
+            StatusBarDebugger.shared.log(.error, "Repository not found for workflow update", context: ["repository": repositoryFullName])
             return false
         }
         
@@ -143,7 +143,7 @@ public class RepositoryManager {
         var repositories = getMonitoredRepositories()
         
         guard let index = repositories.firstIndex(where: { $0.fullName == repositoryFullName }) else {
-            print("❌ RepositoryManager: Repository \(repositoryFullName) not found for workflow update")
+            StatusBarDebugger.shared.log(.error, "Repository not found for workflow update", context: ["repository": repositoryFullName])
             return false
         }
         
@@ -162,10 +162,10 @@ public class RepositoryManager {
         do {
             let data = try JSONEncoder().encode(repositories)
             userDefaults.set(data, forKey: repositoriesKey)
-            print("✅ RepositoryManager: Saved \(repositories.count) repositories")
+            StatusBarDebugger.shared.log(.state, "Saved repositories", context: ["count": repositories.count])
             return true
         } catch {
-            print("❌ RepositoryManager: Failed to save repositories: \(error)")
+            StatusBarDebugger.shared.log(.error, "Failed to save repositories", context: ["error": error.localizedDescription])
             return false
         }
     }
@@ -189,15 +189,15 @@ public class RepositoryManager {
                 if let error = hasError {
                     completion(.failure(error))
                 } else {
-                    print("📊 RepositoryManager: Total repositories before deduplication: \(allRepositories.count)")
+                    StatusBarDebugger.shared.log(.network, "Total repositories before deduplication", context: ["count": allRepositories.count])
                     
                     // Remove duplicates and sort (using fullName since id field is commented out)
                     let uniqueRepos = Array(Set(allRepositories.map { $0.fullName })).compactMap { fullName in
                         allRepositories.first { $0.fullName == fullName }
                     }.sorted { $0.fullName < $1.fullName }
                     
-                    print("📊 RepositoryManager: Total unique repositories after deduplication: \(uniqueRepos.count)")
-                    print("📊 RepositoryManager: Sample repositories: \(uniqueRepos.prefix(5).map { $0.fullName })")
+                    StatusBarDebugger.shared.log(.network, "Total unique repositories after deduplication", context: ["count": uniqueRepos.count])
+                    StatusBarDebugger.shared.log(.network, "Sample repositories", context: ["sample": uniqueRepos.prefix(5).map { $0.fullName }])
                     
                     completion(.success(uniqueRepos))
                 }
@@ -208,10 +208,10 @@ public class RepositoryManager {
         gitHubClient.getRepositories { result in
             switch result {
             case .success(let repos):
-                print("📊 RepositoryManager: Found \(repos.count) user repositories")
+                StatusBarDebugger.shared.log(.network, "Found user repositories", context: ["count": repos.count])
                 allRepositories.append(contentsOf: repos)
             case .failure(let error):
-                print("❌ RepositoryManager: Failed to fetch user repositories: \(error)")
+                StatusBarDebugger.shared.log(.error, "Failed to fetch user repositories", context: ["error": error.localizedDescription])
                 hasError = error
             }
             completeIfDone()
@@ -221,7 +221,7 @@ public class RepositoryManager {
         gitHubClient.getUserOrganizations { [weak self] result in
             switch result {
             case .success(let organizations):
-                print("📊 RepositoryManager: Found \(organizations.count) organizations: \(organizations.map { $0.login })")
+                StatusBarDebugger.shared.log(.network, "Found organizations", context: ["count": organizations.count, "organizations": organizations.map { $0.login }])
                 if organizations.isEmpty {
                     completeIfDone()
                     return
@@ -231,15 +231,15 @@ public class RepositoryManager {
                 let totalOrgs = organizations.count
                 
                 for org in organizations {
-                    print("🏢 RepositoryManager: Fetching repositories for organization: \(org.login)")
+                    StatusBarDebugger.shared.log(.network, "Fetching repositories for organization", context: ["organization": org.login])
                     self?.gitHubClient.getOrganizationRepositories(org: org.login) { orgRepoResult in
                         switch orgRepoResult {
                         case .success(let orgRepos):
-                            print("📊 RepositoryManager: Found \(orgRepos.count) repositories in organization \(org.login)")
+                            StatusBarDebugger.shared.log(.network, "Found repositories in organization", context: ["count": orgRepos.count, "organization": org.login])
                             allRepositories.append(contentsOf: orgRepos)
                         case .failure(let error):
                             // Don't fail entire operation if one org fails
-                            print("❌ RepositoryManager: Failed to fetch repos for org \(org.login): \(error)")
+                            StatusBarDebugger.shared.log(.error, "Failed to fetch repos for organization", context: ["organization": org.login, "error": error.localizedDescription])
                         }
                         
                         orgReposCompleted += 1
