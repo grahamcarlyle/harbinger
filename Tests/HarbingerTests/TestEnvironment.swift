@@ -45,24 +45,12 @@ class TestEnvironment {
         if ProcessInfo.processInfo.environment["VERBOSE_TESTS"] != "1" {
             verboseTestOutput = false
         }
-        
-        // Log test mode (this will still show since it's intentional test info)
-        logTestMode()
     }
     
     /// Tears down the test environment
     static func tearDownTestEnvironment() {
         // Re-enable console logging for normal app usage
         StatusBarDebugger.shared.enableConsoleLogging()
-    }
-    
-    /// Logs the current test environment mode
-    static func logTestMode() {
-        if shouldRunFullGUITests() {
-            print("🖥️ Running full GUI tests with AppKit components")
-        } else {
-            print("🤖 Running in CI/headless mode - testing logic without full GUI")
-        }
     }
     
     /// Sets up graphics context for GUI tests if needed
