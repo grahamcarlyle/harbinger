@@ -6,11 +6,19 @@ final class RepositorySettingsWindowTests: XCTestCase {
     
     var settingsWindow: RepositorySettingsWindow!
     
+    override class func setUp() {
+        super.setUp()
+        TestEnvironment.setupTestEnvironment()
+    }
+    
+    override class func tearDown() {
+        TestEnvironment.tearDownTestEnvironment()
+        super.tearDown()
+    }
+    
     override func setUp() {
         super.setUp()
         settingsWindow = RepositorySettingsWindow()
-        
-        TestEnvironment.logTestMode()
         
         if TestEnvironment.shouldRunFullGUITests() {
             // Full GUI testing - show windows and make them key

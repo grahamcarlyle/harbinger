@@ -67,7 +67,7 @@ class AuthManager {
         let bodyString = "client_id=\(GitHubOAuthConfig.clientID)&scope=\(scopeString)"
         request.httpBody = bodyString.data(using: .utf8)
         
-        print("🔧 AuthManager: Sending device code request...")
+        StatusBarDebugger.shared.log(.network, "AuthManager: Sending device code request")
         
         // Make request
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
@@ -110,13 +110,13 @@ class AuthManager {
     private func handleDeviceCodeResponse(data: Data?, response: URLResponse?, error: Error?, completion: @escaping (Result<(userCode: String, verificationURI: String), AuthError>) -> Void) {
         
         if let error = error {
-            print("❌ AuthManager: Network error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "AuthManager: Network error", context: ["error": error.localizedDescription])
             completion(.failure(.networkError(error.localizedDescription)))
             return
         }
         
         guard let data = data else {
-            print("❌ AuthManager: No data received")
+            StatusBarDebugger.shared.log(.error, "AuthManager: No data received")
             completion(.failure(.invalidResponse))
             return
         }
@@ -125,7 +125,7 @@ class AuthManager {
             let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
             
             if let errorCode = json?["error"] as? String {
-                print("❌ AuthManager: GitHub error: \(errorCode)")
+                StatusBarDebugger.shared.log(.error, "AuthManager: GitHub error", context: ["errorCode": errorCode])
                 let error = mapGitHubError(errorCode)
                 completion(.failure(error))
                 return
@@ -135,7 +135,7 @@ class AuthManager {
                   let userCode = json?["user_code"] as? String,
                   let verificationURI = json?["verification_uri"] as? String,
                   let expiresIn = json?["expires_in"] as? Int else {
-                print("❌ AuthManager: Invalid response format")
+                StatusBarDebugger.shared.log(.error, "AuthManager: Invalid response format")
                 completion(.failure(.invalidResponse))
                 return
             }
@@ -146,14 +146,14 @@ class AuthManager {
             self.verificationURI = verificationURI
             self.expiresAt = Date().addingTimeInterval(TimeInterval(expiresIn))
             
-            print("✅ AuthManager: Device code received")
-            print("🔧 AuthManager: User code: \(userCode)")
-            print("🔧 AuthManager: Verification URI: \(verificationURI)")
+            StatusBarDebugger.shared.log(.network, "AuthManager: Device code received")
+            StatusBarDebugger.shared.log(.network, "AuthManager: User code received", context: ["userCode": userCode])
+            StatusBarDebugger.shared.log(.network, "AuthManager: Verification URI received", context: ["uri": verificationURI])
             
             completion(.success((userCode: userCode, verificationURI: verificationURI)))
             
         } catch {
-            print("❌ AuthManager: JSON parsing error: \(error.localizedDescription)")
+            StatusBarDebugger.shared.log(.error, "AuthManager: JSON parsing error", context: ["error": error.localizedDescription])
             completion(.failure(.invalidResponse))
         }
     }

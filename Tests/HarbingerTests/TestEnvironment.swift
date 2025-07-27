@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+@testable import HarbingerCore
 
 /// Utility class for detecting test environment and configuring appropriate test behavior
 class TestEnvironment {
@@ -33,6 +34,27 @@ class TestEnvironment {
     }
     
     // MARK: - Test Setup Helpers
+    
+    /// Sets up the test environment and logging
+    static func setupTestEnvironment() {
+        // Disable console logging to keep test output clean
+        // This will eliminate most of the debug noise during tests
+        StatusBarDebugger.shared.disableConsoleLogging()
+        
+        // Set verbosity based on environment
+        if ProcessInfo.processInfo.environment["VERBOSE_TESTS"] != "1" {
+            verboseTestOutput = false
+        }
+        
+        // Log test mode (this will still show since it's intentional test info)
+        logTestMode()
+    }
+    
+    /// Tears down the test environment
+    static func tearDownTestEnvironment() {
+        // Re-enable console logging for normal app usage
+        StatusBarDebugger.shared.enableConsoleLogging()
+    }
     
     /// Logs the current test environment mode
     static func logTestMode() {
@@ -69,5 +91,25 @@ class TestEnvironment {
     static func runHeadlessTest<T>(_ block: () throws -> T) rethrows -> T? {
         guard !shouldRunFullGUITests() else { return nil }
         return try block()
+    }
+    
+    // MARK: - Test-Aware Output
+    
+    /// Controls whether test debug output should be shown
+    public static var verboseTestOutput: Bool = {
+        // Check for explicit verbose flag
+        if ProcessInfo.processInfo.environment["VERBOSE_TESTS"] == "1" {
+            return true
+        }
+        // Default to quiet in CI, verbose locally
+        return !isRunningInCI()
+    }()
+    
+    /// Test-aware print that respects verbosity settings
+    static func testPrint(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+        guard verboseTestOutput else { return }
+        
+        let output = items.map { "\($0)" }.joined(separator: separator)
+        Swift.print(output, terminator: terminator)
     }
 }

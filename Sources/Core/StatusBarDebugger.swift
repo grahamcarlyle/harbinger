@@ -11,6 +11,24 @@ public class StatusBarDebugger {
     private let maxLogEntries = 1000
     private let logFileURL: URL
     
+    // Control whether to output to console (can be disabled during tests)
+    // Auto-detect test environment and disable console logging by default in tests
+    public var consoleLoggingEnabled: Bool = {
+        // Check if we're running in a test environment
+        let isInTests = NSClassFromString("XCTest") != nil || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        return !isInTests  // Disable console logging in tests, enable otherwise
+    }()
+    
+    // Convenience method to disable console logging during tests
+    public func disableConsoleLogging() {
+        consoleLoggingEnabled = false
+    }
+    
+    // Convenience method to re-enable console logging
+    public func enableConsoleLogging() {
+        consoleLoggingEnabled = true
+    }
+    
     private init() {
         // Create logs directory in user's Documents folder
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -86,9 +104,13 @@ public class StatusBarDebugger {
                     category == .healing ? "🩹" : "🔧"
         
         let formattedOutput = "\(prefix) \(entry.formattedOutput)"
-        print(formattedOutput)
         
-        // Write to log file
+        // Print to console only if enabled
+        if consoleLoggingEnabled {
+            print(formattedOutput)
+        }
+        
+        // Always write to log file
         writeToLogFile(formattedOutput)
     }
     

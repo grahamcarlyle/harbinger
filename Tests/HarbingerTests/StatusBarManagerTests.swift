@@ -6,10 +6,19 @@ final class StatusBarManagerTests: XCTestCase {
     
     var statusBarManager: StatusBarManager!
     
+    override class func setUp() {
+        super.setUp()
+        TestEnvironment.setupTestEnvironment()
+    }
+    
+    override class func tearDown() {
+        TestEnvironment.tearDownTestEnvironment()
+        super.tearDown()
+    }
+    
     override func setUp() {
         super.setUp()
         
-        TestEnvironment.logTestMode()
         TestEnvironment.setupGraphicsContextIfNeeded()
         
         statusBarManager = StatusBarManager()

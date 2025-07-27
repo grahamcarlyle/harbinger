@@ -197,7 +197,7 @@ public class WorkflowMonitor {
         let repositories = repositoryManager.getMonitoredRepositories()
         
         guard !repositories.isEmpty else {
-            print("ℹ️ WorkflowMonitor: No repositories to monitor")
+            StatusBarDebugger.shared.log(.lifecycle, "WorkflowMonitor: No repositories to monitor")
             delegate?.workflowMonitor(self, didUpdateOverallStatus: .unknown, statusText: "No repositories monitored")
             return
         }

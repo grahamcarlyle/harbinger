@@ -67,9 +67,9 @@ public class GitHubClient {
         // Add auth header if token is available
         if let accessToken = GitHubOAuthConfig.accessToken {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            print("🔧 GitHubClient: Fetching workflow runs for \(owner)/\(repo) (authenticated)")
+            StatusBarDebugger.shared.log(.network, "GitHubClient: Fetching workflow runs (authenticated)", context: ["owner": owner, "repo": repo])
         } else {
-            print("🔧 GitHubClient: Fetching workflow runs for \(owner)/\(repo) (unauthenticated - public only)")
+            StatusBarDebugger.shared.log(.network, "GitHubClient: Fetching workflow runs (unauthenticated)", context: ["owner": owner, "repo": repo])
         }
         
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
@@ -250,9 +250,9 @@ public class GitHubClient {
         // Add auth header if token is available
         if let accessToken = GitHubOAuthConfig.accessToken {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            print("🔧 GitHubClient: Fetching workflows for \(owner)/\(repo) (authenticated)")
+            StatusBarDebugger.shared.log(.network, "GitHubClient: Fetching workflows (authenticated)", context: ["owner": owner, "repo": repo])
         } else {
-            print("🔧 GitHubClient: Fetching workflows for \(owner)/\(repo) (unauthenticated - public only)")
+            StatusBarDebugger.shared.log(.network, "GitHubClient: Fetching workflows (unauthenticated)", context: ["owner": owner, "repo": repo])
         }
         
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
@@ -316,12 +316,12 @@ public class GitHubClient {
             return
         }
         
-        print("🔧 GitHubClient: Received \(data.count) bytes of data")
+        StatusBarDebugger.shared.log(.network, "GitHubClient: Received data", context: ["bytes": data.count])
         
         // Debug: Print first 200 characters of response for debugging
         if let responseString = String(data: data, encoding: .utf8) {
             let preview = String(responseString.prefix(200))
-            print("🔧 GitHubClient: Response preview: \(preview)")
+            StatusBarDebugger.shared.log(.network, "GitHubClient: Response preview", context: ["preview": preview])
         }
         
         do {
@@ -746,7 +746,7 @@ public class GitHubClient {
             return
         }
         
-        print("🔧 GitHubClient: Received \(data.count) bytes of search data")
+        StatusBarDebugger.shared.log(.network, "GitHubClient: Received search data", context: ["bytes": data.count])
         
         do {
             let decoder = JSONDecoder()
