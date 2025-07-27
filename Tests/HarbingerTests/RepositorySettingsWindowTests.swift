@@ -690,8 +690,8 @@ final class RepositorySettingsWindowTests: XCTestCase {
             )
         ]
         
-        // Set mock data in the GitHub client - this ensures no real API calls
-        mockGitHubClient.mockPersonalRepositories = mockPersonalRepos
+        // Set test data directly in the settings window - this ensures no real API calls
+        settingsWindow.setTestData(personalRepositories: mockPersonalRepos)
         
         // Switch to personal tab
         switchToTab(identifier: "personal")
