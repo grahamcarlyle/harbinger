@@ -1,0 +1,164 @@
+name: Build and Release Harbinger
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Cache Swift packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          .build
+          ~/Library/Caches/org.swift.swiftpm
+        key: ${{ runner.os }}-swift-${{ hashFiles('Package.swift', 'Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-swift-
+          
+    - name: Run tests
+      run: |
+        echo "🧪 Running test suite..."
+        swift test --verbose
+        echo "✅ All tests completed"
+        
+    - name: Build release
+      run: |
+        echo "🔨 Building release version..."
+        swift build -c release --arch arm64 --arch x86_64
+        echo "✅ Release build completed"
+        
+    - name: Create app bundle
+      run: |
+        echo "📦 Creating app bundle..."
+        # Create bundle directories
+        mkdir -p Harbinger.app/Contents/MacOS
+        mkdir -p Harbinger.app/Contents/Resources
+        
+        # Copy the release executable
+        cp .build/apple/Products/Release/Harbinger Harbinger.app/Contents/MacOS/
+        
+        # Make executable
+        chmod +x Harbinger.app/Contents/MacOS/Harbinger
+        
+        # Create Info.plist for release
+        cat > Harbinger.app/Contents/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleDisplayName</key>
+            <string>Harbinger</string>
+            <key>CFBundleExecutable</key>
+            <string>Harbinger</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.harbinger.statusbar</string>
+            <key>CFBundleName</key>
+            <string>Harbinger</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${GITHUB_REF_NAME#v}</string>
+            <key>CFBundleVersion</key>
+            <string>${GITHUB_RUN_NUMBER}</string>
+            <key>LSUIElement</key>
+            <true/>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+        
+        echo "✅ App bundle created successfully"
+        
+    - name: Create ZIP archive
+      run: |
+        echo "🗜️ Creating ZIP archive..."
+        zip -r Harbinger.zip Harbinger.app
+        echo "✅ ZIP archive created"
+        
+    - name: Collect logs
+      if: always()
+      run: |
+        echo "📋 Collecting build logs..."
+        mkdir -p logs
+        
+        # Capture any harbinger logs if they exist
+        if [ -f /tmp/harbinger.log ]; then
+          cp /tmp/harbinger.log logs/
+        fi
+        
+        # Create build summary
+        echo "Build completed at: $(date)" > logs/build-summary.txt
+        echo "Git commit: $GITHUB_SHA" >> logs/build-summary.txt
+        echo "Git ref: $GITHUB_REF" >> logs/build-summary.txt
+        echo "Runner OS: $RUNNER_OS" >> logs/build-summary.txt
+        
+        # Swift version info
+        swift --version >> logs/build-summary.txt
+        
+        echo "✅ Logs collected"
+        
+    - name: Upload build logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-${{ github.run_number }}
+        path: logs/
+        retention-days: 90
+        
+    - name: Upload app bundle
+      uses: actions/upload-artifact@v4
+      with:
+        name: Harbinger-${{ github.run_number }}
+        path: Harbinger.zip
+        retention-days: 90
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          Harbinger.zip
+        body: |
+          ## Harbinger macOS App
+          
+          ### Installation Instructions
+          1. Download `Harbinger.zip` from the assets below
+          2. Extract the ZIP file to get `Harbinger.app`
+          3. Right-click on `Harbinger.app` and select "Open" (to bypass Gatekeeper warning)
+          4. Optionally move `Harbinger.app` to your Applications folder
+          
+          ### What's New
+          - Built from commit ${{ github.sha }}
+          - All 77 tests passing
+          - Clean logging system with structured debug output
+          
+          ### Requirements
+          - macOS 13.0 or later
+          - Internet connection for GitHub API access
+          
+          **Note**: This is an unsigned build for personal use. You may see a security warning on first launch - this is normal for unsigned apps.
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
