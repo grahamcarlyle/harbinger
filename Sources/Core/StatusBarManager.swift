@@ -26,6 +26,24 @@ public class ColoredMenuItemView: NSView {
         self.menuItem = item
     }
     
+    private func configureTextColor() {
+        titleLabel.textColor = getMainTextColor()
+    }
+    
+    private func getMainTextColor() -> NSColor {
+        // Enhanced failure visibility with semantic colors
+        switch status {
+        case .failure:
+            return .systemRed  // Critical red for failures
+        case .success:
+            return .systemGreen  // Success green
+        case .running:
+            return .systemYellow  // In-progress yellow
+        case .unknown, .none:
+            return .labelColor  // Dynamic system color
+        }
+    }
+    
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -37,7 +55,10 @@ public class ColoredMenuItemView: NSView {
         titleLabel.isSelectable = false
         titleLabel.isBordered = false
         titleLabel.backgroundColor = NSColor.clear
-        titleLabel.textColor = NSColor.black
+        
+        // Use dynamic colors for proper light/dark mode support
+        configureTextColor()
+        
         titleLabel.cell?.wraps = false
         titleLabel.cell?.isScrollable = true
         titleLabel.maximumNumberOfLines = 1
@@ -49,7 +70,13 @@ public class ColoredMenuItemView: NSView {
         if isHeader {
             titleLabel.font = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
         } else {
-            titleLabel.font = NSFont.menuFont(ofSize: NSFont.systemFontSize)
+            // Enhanced emphasis for failures
+            let fontSize = NSFont.systemFontSize
+            if status == .failure {
+                titleLabel.font = NSFont.boldSystemFont(ofSize: fontSize)  // Bold for failures
+            } else {
+                titleLabel.font = NSFont.menuFont(ofSize: fontSize)
+            }
             
             // Handle styled text for build entries
             if title.contains(" • ") {
@@ -134,14 +161,16 @@ public class ColoredMenuItemView: NSView {
             let timestamp = parts[2]
             let commitHash = parts[3]
             
-            // Set default font and color
-            let mainFont = NSFont.menuFont(ofSize: NSFont.systemFontSize)
-            attributedString.addAttribute(.font, value: mainFont, range: NSRange(location: 0, length: attributedString.length))
-            attributedString.addAttribute(.foregroundColor, value: NSColor.black, range: NSRange(location: 0, length: attributedString.length))
+            // Set default font and color with status-aware styling
+            let mainFont = status == .failure ? NSFont.boldSystemFont(ofSize: NSFont.systemFontSize) : NSFont.menuFont(ofSize: NSFont.systemFontSize)
+            let mainColor = getMainTextColor()
             
-            // Make author, timestamp, and hash smaller but keep black for contrast
+            attributedString.addAttribute(.font, value: mainFont, range: NSRange(location: 0, length: attributedString.length))
+            attributedString.addAttribute(.foregroundColor, value: mainColor, range: NSRange(location: 0, length: attributedString.length))
+            
+            // Make author, timestamp, and hash smaller with secondary color for hierarchy
             let smallFont = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
-            let blackColor = NSColor.black
+            let secondaryColor = NSColor.secondaryLabelColor
             
             let authorRange = (title as NSString).range(of: author)
             let timestampRange = (title as NSString).range(of: timestamp)
@@ -149,15 +178,15 @@ public class ColoredMenuItemView: NSView {
             
             if authorRange.location != NSNotFound {
                 attributedString.addAttribute(.font, value: smallFont, range: authorRange)
-                attributedString.addAttribute(.foregroundColor, value: blackColor, range: authorRange)
+                attributedString.addAttribute(.foregroundColor, value: secondaryColor, range: authorRange)
             }
             if timestampRange.location != NSNotFound {
                 attributedString.addAttribute(.font, value: smallFont, range: timestampRange)
-                attributedString.addAttribute(.foregroundColor, value: blackColor, range: timestampRange)
+                attributedString.addAttribute(.foregroundColor, value: secondaryColor, range: timestampRange)
             }
             if hashRange.location != NSNotFound {
                 attributedString.addAttribute(.font, value: smallFont, range: hashRange)
-                attributedString.addAttribute(.foregroundColor, value: blackColor, range: hashRange)
+                attributedString.addAttribute(.foregroundColor, value: secondaryColor, range: hashRange)
             }
         }
         
@@ -165,47 +194,64 @@ public class ColoredMenuItemView: NSView {
     }
     
     public override func draw(_ dirtyRect: NSRect) {
-        // Fill the entire available space with solid color based on status
-        var backgroundColor: NSColor
+        let fillRect = NSRect(x: 0, y: 0, width: max(bounds.width, frame.width), height: bounds.height)
+        
+        // Use subtle background hints instead of solid colors (Apple HIG compliant)
+        var backgroundColor: NSColor = .controlBackgroundColor
         
         if let status = status {
             switch status {
-            case .success:
-                backgroundColor = NSColor.systemGreen
             case .failure:
-                backgroundColor = NSColor.systemRed
+                // Enhanced failure visibility with subtle red background
+                backgroundColor = NSColor.systemRed.withAlphaComponent(0.12)
+            case .success:
+                // Subtle green hint for success
+                backgroundColor = NSColor.systemGreen.withAlphaComponent(0.08)
             case .running:
-                backgroundColor = NSColor.systemYellow
+                // Subtle yellow hint for in-progress
+                backgroundColor = NSColor.systemYellow.withAlphaComponent(0.08)
             case .unknown:
-                backgroundColor = NSColor.systemGray
+                // Default menu background
+                backgroundColor = .controlBackgroundColor
             }
-        } else {
-            backgroundColor = NSColor.controlBackgroundColor
         }
         
-        // Apply hover effect - make colors slightly lighter/more prominent
+        // Enhanced hover effect with better contrast
         if isHovered {
-            backgroundColor = backgroundColor.blended(withFraction: 0.2, of: NSColor.white) ?? backgroundColor
+            if status == .failure {
+                // More prominent hover for failures
+                backgroundColor = NSColor.systemRed.withAlphaComponent(0.20)
+            } else {
+                backgroundColor = backgroundColor.blended(withFraction: 0.15, of: NSColor.controlAccentColor) ?? backgroundColor
+            }
         }
         
         backgroundColor.setFill()
-        
-        // Fill the entire bounds including any extra width the menu system provides
-        let fillRect = NSRect(x: 0, y: 0, width: max(bounds.width, frame.width), height: bounds.height)
         fillRect.fill()
         
-        // Add subtle visual indicators for clickability
-        let indicatorColor = NSColor.black.withAlphaComponent(0.1)
-        indicatorColor.setStroke()
+        // Add status indicator border for enhanced visibility
+        if let status = status {
+            let borderColor: NSColor
+            switch status {
+            case .failure:
+                borderColor = NSColor.systemRed.withAlphaComponent(0.6)
+            case .success:
+                borderColor = NSColor.systemGreen.withAlphaComponent(0.4)
+            case .running:
+                borderColor = NSColor.systemYellow.withAlphaComponent(0.4)
+            case .unknown:
+                borderColor = NSColor.systemGray.withAlphaComponent(0.3)
+            }
+            
+            borderColor.setStroke()
+            let leftBorder = NSBezierPath()
+            leftBorder.move(to: NSPoint(x: 0, y: 0))
+            leftBorder.line(to: NSPoint(x: 0, y: fillRect.height))
+            leftBorder.lineWidth = status == .failure ? 3.0 : 2.0  // Thicker border for failures
+            leftBorder.stroke()
+        }
         
-        // Add a subtle left border to indicate clickable items
-        let leftBorder = NSBezierPath()
-        leftBorder.move(to: NSPoint(x: 0, y: 0))
-        leftBorder.line(to: NSPoint(x: 0, y: fillRect.height))
-        leftBorder.lineWidth = 2.0
-        leftBorder.stroke()
-        
-        // Add subtle border on hover for additional clickable indication
+        // Add subtle hover border
         if isHovered {
             let borderColor = NSColor.controlAccentColor.withAlphaComponent(0.8)
             borderColor.setStroke()
@@ -508,13 +554,8 @@ public class StatusBarManager: NSObject {
     }
     
     private func addRepositoryStatusToMenu(_ repoStatus: RepositoryWorkflowStatus) {
-        // Add separator before each repository group (except the first one)
-        if let menu = menu, menu.items.count > 1 && menu.items.contains(where: { $0.view is ColoredMenuItemView }) {
-            menu.addItem(NSMenuItem.separator())
-        }
-        
-        // Repository header with just the name and icon - clickable to open repo
-        let repoTitle = "📁 \(repoStatus.repository.displayName)"
+        // Repository header - clickable to open repo (status shown via background/text color)
+        let repoTitle = "\(repoStatus.repository.displayName)"
         let repoItem = createHeaderMenuItem(title: repoTitle, action: #selector(openRepositoryURL(_:)), url: repoStatus.repository.url, status: repoStatus.overallStatus)
         menu?.addItem(repoItem)
         
@@ -525,9 +566,9 @@ public class StatusBarManager: NSObject {
         for workflowName in sortedWorkflowNames {
             guard let workflows = workflowGroups[workflowName] else { continue }
             
-            // Workflow name header - clickable to open workflow page
+            // Workflow name header - clickable to open workflow page (status shown via background/text color)
             let mostRecentWorkflow = workflows.first!
-            let workflowTitle = "    \(mostRecentWorkflow.statusEmoji) \(workflowName)"
+            let workflowTitle = "    \(workflowName)"
             let workflowURL = generateWorkflowURL(repositoryURL: repoStatus.repository.url, workflowName: workflowName)
             let workflowItem = createHeaderMenuItem(title: workflowTitle, action: #selector(openWorkflowURL(_:)), url: workflowURL, status: mostRecentWorkflow.status)
             menu?.addItem(workflowItem)
@@ -609,39 +650,66 @@ public class StatusBarManager: NSObject {
     }
     
     public func createStatusIcon(for status: WorkflowStatus) -> NSImage {
+        // Use SF Symbols for Apple HIG compliance
+        let symbolName: String
+        switch status {
+        case .unknown:
+            symbolName = "questionmark.circle"
+        case .passing:
+            symbolName = "checkmark.circle"
+        case .failing:
+            symbolName = "xmark.circle"
+        case .running:
+            symbolName = "hourglass"
+        }
+        
+        // Create template image that adapts to system theme
+        let description = "\(status)"
+        guard let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) else {
+            // Fallback to simple circle if SF Symbol unavailable
+            return createFallbackStatusIcon(for: status)
+        }
+        
+        // Configure as template image for proper dark mode support
+        image.isTemplate = true
+        
+        // Apply critical tinting to status bar button for failures
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            switch status {
+            case .failing:
+                // Red tint for critical failures - highly visible
+                self.statusItem?.button?.contentTintColor = .systemRed
+            case .running:
+                // Yellow tint for in-progress builds
+                self.statusItem?.button?.contentTintColor = .systemYellow
+            case .passing, .unknown:
+                // No tint - use system default (adapts to theme)
+                self.statusItem?.button?.contentTintColor = nil
+            }
+        }
+        
+        return image
+    }
+    
+    // Fallback for older macOS versions without SF Symbols
+    private func createFallbackStatusIcon(for status: WorkflowStatus) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size)
         
         image.lockFocus()
         
-        // Draw colored circle
-        let rect = NSRect(x: 2, y: 2, width: 14, height: 14)
+        // Draw simple circle as template
+        let rect = NSRect(x: 3, y: 3, width: 12, height: 12)
         let path = NSBezierPath(ovalIn: rect)
         
-        let color: NSColor
-        switch status {
-        case .unknown:
-            color = NSColor.systemGray
-        case .passing:
-            color = NSColor.systemGreen
-        case .failing:
-            color = NSColor.systemRed
-        case .running:
-            color = NSColor.systemYellow
-        }
-        
-        color.setFill()
+        // Use black for template image
+        NSColor.black.setFill()
         path.fill()
         
-        // Add border
-        NSColor.controlAccentColor.setStroke()
-        path.lineWidth = 1.0
-        path.stroke()
-        
         image.unlockFocus()
-        
-        // Don't make template image so we can show actual colors
-        image.isTemplate = false
+        image.isTemplate = true
         
         return image
     }

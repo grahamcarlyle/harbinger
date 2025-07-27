@@ -1,4 +1,5 @@
 import Foundation
+import Cocoa
 
 // MARK: - Workflow Status Models
 
@@ -100,6 +101,49 @@ public struct WorkflowRunSummary {
         case .running: return "🟡"
         case .unknown: return "⚪"
         }
+    }
+    
+    // SF Symbols version for Apple HIG compliance with semantic colors
+    public func statusIcon() -> NSImage? {
+        let symbolName: String
+        switch status {
+        case .success:
+            symbolName = "checkmark.circle.fill"
+        case .failure:
+            symbolName = "xmark.circle.fill"
+        case .running:
+            symbolName = "hourglass.circle.fill"
+        case .unknown:
+            symbolName = "questionmark.circle.fill"
+        }
+        
+        let description = "\(status)"
+        guard let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) else {
+            return nil
+        }
+        
+        // Apply semantic colors for enhanced visibility
+        let color: NSColor
+        switch status {
+        case .success:
+            color = .systemGreen
+        case .failure:
+            color = .systemRed  // Critical red for failures
+        case .running:
+            color = .systemYellow
+        case .unknown:
+            color = .systemGray
+        }
+        
+        // Create tinted version
+        let tintedImage = image.copy() as! NSImage
+        tintedImage.lockFocus()
+        color.set()
+        let imageRect = NSRect(origin: .zero, size: image.size)
+        imageRect.fill(using: NSCompositingOperation.sourceAtop)
+        tintedImage.unlockFocus()
+        
+        return tintedImage
     }
     
     public var shortCommitSha: String {
