@@ -1,5 +1,5 @@
 import XCTest
-@testable import Harbinger
+@testable import HarbingerCore
 
 final class GitHubAPITests: XCTestCase {
     
@@ -36,9 +36,12 @@ final class GitHubAPITests: XCTestCase {
                     XCTAssertTrue(["completed", "in_progress", "queued"].contains(firstRun.status), 
                                 "Workflow status should be valid")
                     
-                    print("✅ Test: Found workflow run '\(firstRun.name ?? "Unknown")' with status '\(firstRun.displayStatus)'")
-                    print("   URL: \(firstRun.htmlUrl)")
-                    print("   Commit: \(firstRun.headSha)")
+                    StatusBarDebugger.shared.log(.verification, "Found workflow run", context: [
+                        "name": firstRun.name ?? "Unknown",
+                        "status": firstRun.displayStatus,
+                        "url": firstRun.htmlUrl,
+                        "commit": firstRun.headSha
+                    ])
                 }
                 
                 expectation.fulfill()
@@ -72,8 +75,11 @@ final class GitHubAPITests: XCTestCase {
                     XCTAssertTrue(["active", "disabled"].contains(firstWorkflow.state), 
                                 "Workflow state should be valid")
                     
-                    print("✅ Test: Found workflow '\(firstWorkflow.name)' with state '\(firstWorkflow.state)'")
-                    print("   URL: \(firstWorkflow.htmlUrl)")
+                    StatusBarDebugger.shared.log(.verification, "Found workflow", context: [
+                        "name": firstWorkflow.name,
+                        "state": firstWorkflow.state,
+                        "url": firstWorkflow.htmlUrl
+                    ])
                 }
                 
                 expectation.fulfill()
@@ -105,7 +111,10 @@ final class GitHubAPITests: XCTestCase {
                     XCTAssertFalse(repo.fullName.isEmpty, "Repository should have full name")
                     XCTAssertFalse(repo.owner.login.isEmpty, "Repository should have owner")
                     
-                    print("✅ Test: Found repository '\(repo.fullName)' (private: \(repo.`private`))")
+                    StatusBarDebugger.shared.log(.verification, "Found repository", context: [
+                        "fullName": repo.fullName,
+                        "private": "\(repo.`private`)"
+                    ])
                 }
                 
                 expectation.fulfill()
@@ -125,10 +134,10 @@ final class GitHubAPITests: XCTestCase {
         
         if GitHubOAuthConfig.isConfigured {
             XCTAssertTrue(isAuthenticated, "Should be authenticated when token exists")
-            print("✅ Test: Authentication check passed - token exists")
+            StatusBarDebugger.shared.log(.verification, "Authentication check passed - token exists")
         } else {
             XCTAssertFalse(isAuthenticated, "Should not be authenticated when no token")
-            print("ℹ️ Test: No token configured (expected for clean install)")
+            StatusBarDebugger.shared.log(.state, "No token configured (expected for clean install)")
         }
     }
     
@@ -147,7 +156,7 @@ final class GitHubAPITests: XCTestCase {
                 XCTFail("Should not succeed with invalid repository")
                 
             case .failure(let error):
-                print("✅ Test: Correctly handled error for invalid repository: \(error.localizedDescription)")
+                StatusBarDebugger.shared.log(.verification, "Correctly handled error for invalid repository", context: ["error": error.localizedDescription])
                 
                 // Should be a 404 error
                 if case GitHubClient.GitHubError.apiError(let message) = error {

@@ -41,8 +41,7 @@ final class OAuthConfigTests: XCTestCase {
             "delete_repo"
         ]
         
-        print("🔍 Testing OAuth scope configuration...")
-        print("   Configured scopes: \(GitHubOAuthConfig.scopes)")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing OAuth scope configuration", context: ["configuredScopes": GitHubOAuthConfig.scopes.joined(separator: ", ")])
         
         // Validate each configured scope against GitHub's official list
         for scope in GitHubOAuthConfig.scopes {
@@ -57,10 +56,10 @@ final class OAuthConfigTests: XCTestCase {
                 This test would have caught the invalid 'workflow' scope that caused authentication failure.
                 """
             )
-            print("   ✅ Valid scope: '\(scope)'")
+            StatusBarDebugger.shared.log(.verification, "Valid scope", context: ["scope": scope])
         }
         
-        print("✅ All OAuth scopes are valid!")
+        StatusBarDebugger.shared.log(.verification, "All OAuth scopes are valid")
     }
     
     func testOAuthScopeRequirements() {
@@ -79,7 +78,7 @@ final class OAuthConfigTests: XCTestCase {
             )
         }
         
-        print("✅ OAuth scope requirements validated")
+        StatusBarDebugger.shared.log(.verification, "OAuth scope requirements validated")
     }
     
     // MARK: - OAuth Configuration Tests
@@ -110,7 +109,7 @@ final class OAuthConfigTests: XCTestCase {
             "API base URL must be GitHub's official API URL"
         )
         
-        print("✅ OAuth endpoint configuration validated")
+        StatusBarDebugger.shared.log(.verification, "OAuth endpoint configuration validated")
     }
     
     func testOAuthTimingConfiguration() {
@@ -147,10 +146,11 @@ final class OAuthConfigTests: XCTestCase {
             "Total polling time should not exceed 15 minutes"
         )
         
-        print("✅ OAuth timing configuration validated")
-        print("   Polling interval: \(GitHubOAuthConfig.pollingInterval) seconds")
-        print("   Max attempts: \(GitHubOAuthConfig.maxPollingAttempts)")
-        print("   Total timeout: \(totalPollingTime) seconds (\(totalPollingTime/60) minutes)")
+        StatusBarDebugger.shared.log(.verification, "OAuth timing configuration validated", context: [
+            "pollingInterval": "\(GitHubOAuthConfig.pollingInterval) seconds",
+            "maxAttempts": "\(GitHubOAuthConfig.maxPollingAttempts)",
+            "totalTimeout": "\(totalPollingTime) seconds (\(totalPollingTime/60) minutes)"
+        ])
     }
     
     func testClientIDConfiguration() {
@@ -181,8 +181,7 @@ final class OAuthConfigTests: XCTestCase {
             "Client ID seems too long, check configuration"
         )
         
-        print("✅ OAuth Client ID configuration validated")
-        print("   Client ID: \(clientID)")
+        StatusBarDebugger.shared.log(.verification, "OAuth Client ID configuration validated", context: ["clientID": clientID])
     }
     
     // MARK: - Scope Coverage Tests
@@ -198,10 +197,10 @@ final class OAuthConfigTests: XCTestCase {
         
         // If we only have public_repo, warn about limitations
         if GitHubOAuthConfig.scopes.contains("public_repo") && !GitHubOAuthConfig.scopes.contains("repo") {
-            print("⚠️  Warning: Using 'public_repo' scope only - private repositories will not be accessible")
+            StatusBarDebugger.shared.log(.error, "Warning: Using 'public_repo' scope only - private repositories will not be accessible")
         }
         
-        print("✅ OAuth scopes cover required Harbinger features")
+        StatusBarDebugger.shared.log(.verification, "OAuth scopes cover required Harbinger features")
     }
     
     func testHistoricalScopeIssues() {
@@ -226,6 +225,6 @@ final class OAuthConfigTests: XCTestCase {
             )
         }
         
-        print("✅ No historically problematic scopes detected")
+        StatusBarDebugger.shared.log(.verification, "No historically problematic scopes detected")
     }
 }

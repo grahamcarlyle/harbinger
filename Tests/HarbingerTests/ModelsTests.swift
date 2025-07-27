@@ -102,7 +102,7 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(run.displayStatus, "Success")
         XCTAssertEqual(run.statusColor.description, "Success")
         
-        print("✅ Successfully decoded workflow run model")
+        StatusBarDebugger.shared.log(.verification, "Successfully decoded workflow run model")
     }
     
     func testWorkflowRunStatusMapping() {
@@ -226,7 +226,7 @@ final class ModelsTests: XCTestCase {
         // XCTAssertTrue(repository.isActive) // isActive is not a property of Repository
         XCTAssertEqual(repository.language, "Swift")
         
-        print("✅ Successfully decoded repository model")
+        StatusBarDebugger.shared.log(.verification, "Successfully decoded repository model")
     }
     
     // MARK: - Workflow Model Tests
@@ -264,7 +264,7 @@ final class ModelsTests: XCTestCase {
         XCTAssertTrue(workflow.isActive)
         XCTAssertEqual(workflow.path, ".github/workflows/ci.yml")
         
-        print("✅ Successfully decoded workflow model")
+        StatusBarDebugger.shared.log(.verification, "Successfully decoded workflow model")
     }
     
     // MARK: - WorkflowRunStatus Enum Tests

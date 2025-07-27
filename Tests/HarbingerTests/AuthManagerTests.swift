@@ -20,9 +20,10 @@ final class AuthManagerTests: XCTestCase {
     func testDeviceFlowInitiation() {
         let expectation = XCTestExpectation(description: "Device flow initiation")
         
-        print("🔍 Testing OAuth device flow initiation...")
-        print("   Client ID: \(GitHubOAuthConfig.clientID)")
-        print("   Scopes: \(GitHubOAuthConfig.scopes)")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing OAuth device flow initiation", context: [
+            "clientID": GitHubOAuthConfig.clientID,
+            "scopes": GitHubOAuthConfig.scopes.joined(separator: ", ")
+        ])
         
         authManager.initiateDeviceFlow { result in
             switch result {
@@ -49,9 +50,10 @@ final class AuthManagerTests: XCTestCase {
                     "Verification URI should use HTTPS"
                 )
                 
-                print("   ✅ Device flow initiated successfully")
-                print("   📱 User code: \(userCode)")
-                print("   🔗 Verification URI: \(verificationURI)")
+                StatusBarDebugger.shared.log(.verification, "Device flow initiated successfully", context: [
+                    "userCode": userCode,
+                    "verificationURI": verificationURI
+                ])
                 
                 expectation.fulfill()
                 
@@ -90,8 +92,8 @@ final class AuthManagerTests: XCTestCase {
         }
         
         // This test demonstrates what we'd want to test with dependency injection
-        print("📝 Note: Invalid client ID test skipped - would require dependency injection")
-        print("   In future: Test that invalid client IDs are handled gracefully")
+        StatusBarDebugger.shared.log(.state, "Invalid client ID test skipped - would require dependency injection")
+        StatusBarDebugger.shared.log(.state, "Future: Test that invalid client IDs are handled gracefully")
     }
     
     func testDeviceFlowResponseFormat() {
@@ -118,7 +120,7 @@ final class AuthManagerTests: XCTestCase {
                     "Verification URI should be GitHub's device flow URL. Got: '\(verificationURI)'"
                 )
                 
-                print("   ✅ Device flow response format validated")
+                StatusBarDebugger.shared.log(.verification, "Device flow response format validated")
                 expectation.fulfill()
                 
             case .failure(let error):
@@ -139,7 +141,7 @@ final class AuthManagerTests: XCTestCase {
         // AuthManager should be ready to initiate new flows
         // (We can't directly test private properties, but we can test behavior)
         
-        print("✅ AuthManager initializes in clean state")
+        StatusBarDebugger.shared.log(.verification, "AuthManager initializes in clean state")
     }
     
     func testAuthManagerCancellation() {
@@ -150,7 +152,7 @@ final class AuthManagerTests: XCTestCase {
         // This is a basic state test - more comprehensive testing would require
         // exposing internal state or using dependency injection
         
-        print("✅ AuthManager cancellation works")
+        StatusBarDebugger.shared.log(.verification, "AuthManager cancellation works")
     }
     
     // MARK: - Error Handling Tests
@@ -176,7 +178,7 @@ final class AuthManagerTests: XCTestCase {
             )
         }
         
-        print("✅ AuthManager error types validated")
+        StatusBarDebugger.shared.log(.verification, "AuthManager error types validated")
     }
     
     // MARK: - Network Configuration Tests
@@ -195,8 +197,7 @@ final class AuthManagerTests: XCTestCase {
             "Device flow should use correct GitHub endpoint"
         )
         
-        print("✅ Network request configuration validated")
-        print("   Target URL: \(configuredURL)")
+        StatusBarDebugger.shared.log(.verification, "Network request configuration validated", context: ["targetURL": configuredURL])
     }
     
     // MARK: - Integration Hints
@@ -205,28 +206,32 @@ final class AuthManagerTests: XCTestCase {
         // This test validates that we're ready for integration testing
         // without actually performing the full OAuth flow
         
-        print("🔧 Device Flow Integration Readiness Check:")
+        StatusBarDebugger.shared.log(.lifecycle, "Device Flow Integration Readiness Check")
         
         // Check Client ID format
         let clientID = GitHubOAuthConfig.clientID
-        print("   Client ID configured: \(clientID.isEmpty ? "❌ No" : "✅ Yes")")
+        StatusBarDebugger.shared.log(.state, "Client ID configured", context: ["configured": clientID.isEmpty ? "No" : "Yes"])
         
         // Check scopes
         let scopes = GitHubOAuthConfig.scopes
-        print("   Scopes configured: \(scopes.isEmpty ? "❌ No" : "✅ Yes") (\(scopes.joined(separator: ", ")))")
+        StatusBarDebugger.shared.log(.state, "Scopes configured", context: ["configured": scopes.isEmpty ? "No" : "Yes", "scopes": scopes.joined(separator: ", ")])
         
         // Check endpoints
-        print("   Device endpoint: \(GitHubOAuthConfig.baseURL + GitHubOAuthConfig.deviceCodeURL)")
-        print("   Token endpoint: \(GitHubOAuthConfig.baseURL + GitHubOAuthConfig.accessTokenURL)")
+        StatusBarDebugger.shared.log(.state, "OAuth endpoints", context: [
+            "deviceEndpoint": GitHubOAuthConfig.baseURL + GitHubOAuthConfig.deviceCodeURL,
+            "tokenEndpoint": GitHubOAuthConfig.baseURL + GitHubOAuthConfig.accessTokenURL
+        ])
         
         // Check timing
-        print("   Polling interval: \(GitHubOAuthConfig.pollingInterval)s")
-        print("   Max attempts: \(GitHubOAuthConfig.maxPollingAttempts)")
+        StatusBarDebugger.shared.log(.state, "Polling configuration", context: [
+            "pollingInterval": "\(GitHubOAuthConfig.pollingInterval)s",
+            "maxAttempts": "\(GitHubOAuthConfig.maxPollingAttempts)"
+        ])
         
         // All checks pass if we get here
         XCTAssertTrue(true, "Integration readiness validated")
         
-        print("✅ Ready for OAuth device flow integration testing")
+        StatusBarDebugger.shared.log(.verification, "Ready for OAuth device flow integration testing")
     }
     
     // MARK: - Performance Tests

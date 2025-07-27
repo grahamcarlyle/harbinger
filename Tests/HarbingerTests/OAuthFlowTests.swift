@@ -51,7 +51,7 @@ final class OAuthFlowTests: XCTestCase {
     func testTokenStorageAndRetrieval() {
         let testToken = "test_token_12345_this_is_not_a_real_token"
         
-        print("🔍 Testing OAuth token storage and retrieval...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing OAuth token storage and retrieval")
         
         // Initially should have no token
         XCTAssertNil(
@@ -93,7 +93,7 @@ final class OAuthFlowTests: XCTestCase {
             "Token creation time should be recent (within 5 seconds)"
         )
         
-        print("   ✅ Token storage and retrieval working correctly")
+        StatusBarDebugger.shared.log(.verification, "Token storage and retrieval working correctly")
         
         // Clean up
         GitHubOAuthConfig.clearCredentials()
@@ -109,7 +109,7 @@ final class OAuthFlowTests: XCTestCase {
             "Should not be configured after clearing credentials"
         )
         
-        print("   ✅ Token cleanup working correctly")
+        StatusBarDebugger.shared.log(.verification, "Token cleanup working correctly")
     }
     
     func testTokenValidation() {
@@ -128,7 +128,7 @@ final class OAuthFlowTests: XCTestCase {
             "token with spaces",  // Contains spaces
         ]
         
-        print("🔍 Testing token validation...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing token validation")
         
         // Test valid tokens
         for token in validTokenFormats {
@@ -154,7 +154,7 @@ final class OAuthFlowTests: XCTestCase {
             GitHubOAuthConfig.clearCredentials()
         }
         
-        print("   ✅ Token validation tests completed")
+        StatusBarDebugger.shared.log(.verification, "Token validation tests completed")
     }
     
     // MARK: - Mock OAuth Response Tests
@@ -162,7 +162,7 @@ final class OAuthFlowTests: XCTestCase {
     func testOAuthResponseParsing() {
         // Test parsing of GitHub OAuth responses without making real API calls
         
-        print("🔍 Testing OAuth response parsing...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing OAuth response parsing")
         
         // Mock successful device code response
         let mockDeviceCodeResponse = """
@@ -206,7 +206,7 @@ final class OAuthFlowTests: XCTestCase {
             let errorJson = try JSONSerialization.jsonObject(with: errorData)
             XCTAssertNotNil(errorJson, "Error response should be valid JSON")
             
-            print("   ✅ OAuth response parsing tests passed")
+            StatusBarDebugger.shared.log(.verification, "OAuth response parsing tests passed")
             
         } catch {
             XCTFail("Failed to parse mock OAuth responses: \(error)")
@@ -216,7 +216,7 @@ final class OAuthFlowTests: XCTestCase {
     func testOAuthErrorHandling() {
         // Test OAuth error scenarios without making real API calls
         
-        print("🔍 Testing OAuth error handling...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing OAuth error handling")
         
         let oAuthErrors = [
             ("authorization_pending", "The authorization request is still pending."),
@@ -249,16 +249,16 @@ final class OAuthFlowTests: XCTestCase {
                 "AuthError should have description for '\(errorCode)'"
             )
             
-            print("   ✅ Error '\(errorCode)' mapped correctly")
+            StatusBarDebugger.shared.log(.verification, "Error mapped correctly", context: ["errorCode": errorCode])
         }
         
-        print("   ✅ OAuth error handling tests completed")
+        StatusBarDebugger.shared.log(.verification, "OAuth error handling tests completed")
     }
     
     // MARK: - Keychain Integration Tests
     
     func testKeychainIntegration() {
-        print("🔍 Testing Keychain integration...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing Keychain integration")
         
         let testService = "HarbingerTest"
         let testAccount = "TestToken"
@@ -299,13 +299,13 @@ final class OAuthFlowTests: XCTestCase {
             "Password should be nil after deletion"
         )
         
-        print("   ✅ Keychain integration tests completed")
+        StatusBarDebugger.shared.log(.verification, "Keychain integration tests completed")
     }
     
     func testKeychainSecurityAttributes() {
         // Test that Keychain storage uses appropriate security settings
         
-        print("🔍 Testing Keychain security attributes...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing Keychain security attributes")
         
         let testToken = "test_secure_token_12345"
         
@@ -329,7 +329,7 @@ final class OAuthFlowTests: XCTestCase {
             "Token should persist in Keychain across app sessions"
         )
         
-        print("   ✅ Keychain security attributes validated")
+        StatusBarDebugger.shared.log(.verification, "Keychain security attributes validated")
         
         // Cleanup
         GitHubOAuthConfig.clearCredentials()
@@ -338,7 +338,7 @@ final class OAuthFlowTests: XCTestCase {
     // MARK: - Configuration Edge Cases
     
     func testConfigurationEdgeCases() {
-        print("🔍 Testing configuration edge cases...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing configuration edge cases")
         
         // Test empty scope array
         let originalScopes = GitHubOAuthConfig.scopes
@@ -377,7 +377,7 @@ final class OAuthFlowTests: XCTestCase {
             "Device code URL should start with slash"
         )
         
-        print("   ✅ Configuration edge cases validated")
+        StatusBarDebugger.shared.log(.verification, "Configuration edge cases validated")
     }
     
     // MARK: - OAuth Flow State Machine Tests
@@ -385,7 +385,7 @@ final class OAuthFlowTests: XCTestCase {
     func testOAuthFlowStateMachine() {
         // Test the logical flow of OAuth states without network calls
         
-        print("🔍 Testing OAuth flow state machine...")
+        StatusBarDebugger.shared.log(.lifecycle, "Testing OAuth flow state machine")
         
         // State 1: Initial (no token)
         XCTAssertFalse(
@@ -417,7 +417,7 @@ final class OAuthFlowTests: XCTestCase {
             "Should be unconfigured after clearing credentials"
         )
         
-        print("   ✅ OAuth flow state machine validated")
+        StatusBarDebugger.shared.log(.verification, "OAuth flow state machine validated")
     }
     
     // MARK: - Performance Tests
@@ -453,7 +453,7 @@ final class OAuthFlowTests: XCTestCase {
         // This test validates that we're ready for integration testing
         // without actually performing integration tests
         
-        print("🔧 OAuth Flow Integration Test Preparation:")
+        StatusBarDebugger.shared.log(.lifecycle, "OAuth Flow Integration Test Preparation")
         
         // Validate all required components are available
         XCTAssertNotNil(AuthManager(), "AuthManager should be instantiable")
@@ -468,9 +468,11 @@ final class OAuthFlowTests: XCTestCase {
         let authManager = AuthManager()
         authManager.cancelAuthentication() // Should not crash
         
-        print("   ✅ All components available for integration testing")
-        print("   ✅ Configuration is complete")
-        print("   ✅ Error handling is implemented")
-        print("✅ Ready for OAuth integration testing")
+        StatusBarDebugger.shared.log(.verification, "Integration test preparation complete", context: [
+            "components": "available",
+            "configuration": "complete",
+            "errorHandling": "implemented",
+            "readiness": "ready for OAuth integration testing"
+        ])
     }
 }

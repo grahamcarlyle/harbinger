@@ -30,7 +30,7 @@ final class StatusBarManagerTests: XCTestCase {
     }
     
     func testStatusIconCreation() {
-        print("\n=== STATUS ICON CREATION TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "STATUS ICON CREATION TEST")
         
         // Test actual icon creation with proper graphics context
         let testCases: [(StatusBarManager.WorkflowStatus, String)] = [
@@ -50,24 +50,24 @@ final class StatusBarManagerTests: XCTestCase {
                 XCTAssertFalse(icon.isTemplate, "Icon should not be template to show colors")
                 XCTAssertTrue(icon.representations.count > 0, "Icon should have image representations")
                 
-                print("✅ \(colorName) icon created successfully for \(status) status")
+                StatusBarDebugger.shared.log(.verification, "Icon created successfully", context: ["color": colorName, "status": "\(status)"])
             } else {
                 // In CI/headless mode, test the logic without creating actual NSImage objects
-                print("🤖 Testing \(colorName) status mapping logic for \(status)")
+                StatusBarDebugger.shared.log(.state, "Testing status mapping logic", context: ["color": colorName, "status": "\(status)"])
                 
                 // Test that the status values are valid enum cases
                 XCTAssertTrue([.passing, .failing, .running, .unknown].contains(status), 
                              "Status \(status) should be a valid WorkflowStatus case")
                 
-                print("✅ \(colorName) status logic validated for \(status)")
+                StatusBarDebugger.shared.log(.verification, "Status logic validated", context: ["color": colorName, "status": "\(status)"])
             }
         }
         
-        print("✅ All status icon tests completed")
+        StatusBarDebugger.shared.log(.verification, "All status icon tests completed")
     }
     
     func testStatusIconColorMapping() {
-        print("\n=== STATUS ICON COLOR MAPPING LOGIC TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "STATUS ICON COLOR MAPPING LOGIC TEST")
         
         // Test the color mapping logic separately for extra safety
         let testCases: [(StatusBarManager.WorkflowStatus, NSColor, String)] = [
@@ -92,14 +92,14 @@ final class StatusBarManagerTests: XCTestCase {
             }
             
             XCTAssertEqual(color, expectedColor, "Status \(status) should map to \(colorName) color")
-            print("✅ \(colorName) color mapped correctly for \(status) status")
+            StatusBarDebugger.shared.log(.verification, "Color mapped correctly", context: ["color": colorName, "status": "\(status)"])
         }
         
-        print("✅ All status icon colors mapped correctly")
+        StatusBarDebugger.shared.log(.verification, "All status icon colors mapped correctly")
     }
     
     func testWorkflowStatusConversion() {
-        print("\n=== WORKFLOW STATUS CONVERSION TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "WORKFLOW STATUS CONVERSION TEST")
         
         // Test the conversion from WorkflowRunStatus to internal WorkflowStatus
         let conversions: [(WorkflowRunStatus, StatusBarManager.WorkflowStatus)] = [
@@ -125,14 +125,14 @@ final class StatusBarManagerTests: XCTestCase {
             
             XCTAssertEqual(internalStatus, expectedInternalStatus, 
                           "WorkflowRunStatus.\(runStatus) should convert to WorkflowStatus.\(expectedInternalStatus)")
-            print("✅ \(runStatus) → \(internalStatus)")
+            StatusBarDebugger.shared.log(.verification, "Status conversion", context: ["from": "\(runStatus)", "to": "\(internalStatus)"])
         }
         
-        print("✅ All status conversions working correctly")
+        StatusBarDebugger.shared.log(.verification, "All status conversions working correctly")
     }
     
     func testStatusIconProperties() {
-        print("\n=== STATUS ICON PROPERTIES TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "STATUS ICON PROPERTIES TEST")
         
         let passingIcon = statusBarManager.createStatusIcon(for: .passing)
         
@@ -142,14 +142,11 @@ final class StatusBarManagerTests: XCTestCase {
         XCTAssertFalse(passingIcon.isTemplate, "Icon should not be template to preserve colors")
         XCTAssertTrue(passingIcon.representations.count > 0, "Icon should have content")
         
-        print("✅ Status icon properties verified")
-        print("   - Size: \(passingIcon.size)")
-        print("   - Template: \(passingIcon.isTemplate)")
-        print("   - Representations: \(passingIcon.representations.count)")
+        StatusBarDebugger.shared.log(.verification, "Status icon properties verified", context: ["size": "\(passingIcon.size)", "template": "\(passingIcon.isTemplate)", "representations": "\(passingIcon.representations.count)"])
     }
     
     func testOverallStatusUpdateFlow() {
-        print("\n=== OVERALL STATUS UPDATE FLOW TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "OVERALL STATUS UPDATE FLOW TEST")
         
         // Test the complete flow from WorkflowRunStatus to colored icon
         let testStatuses: [WorkflowRunStatus] = [.success, .failure, .running, .unknown]
@@ -174,14 +171,14 @@ final class StatusBarManagerTests: XCTestCase {
             XCTAssertFalse(icon.isTemplate, "Icon should preserve colors for \(status)")
             XCTAssertEqual(icon.size, NSSize(width: 18, height: 18), "Icon should have correct size for \(status)")
             
-            print("✅ Status update flow works: \(status) → \(internalStatus) → colored icon")
+            StatusBarDebugger.shared.log(.verification, "Status update flow works", context: ["workflowStatus": "\(status)", "internalStatus": "\(internalStatus)"])
         }
         
-        print("✅ Overall status update flow verified")
+        StatusBarDebugger.shared.log(.verification, "Overall status update flow verified")
     }
     
     func testColoredMenuItemViewHoverEffects() {
-        print("\n=== COLORED MENU ITEM VIEW HOVER EFFECTS TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "COLORED MENU ITEM VIEW HOVER EFFECTS TEST")
         
         // Test different status colors and hover effects
         let testCases: [(WorkflowRunStatus, String)] = [
@@ -208,7 +205,7 @@ final class StatusBarManagerTests: XCTestCase {
                 XCTAssertNotNil(menuItemView.subviews.first, "Should have a label subview")
                 XCTAssertEqual(menuItemView.subviews.count, 1, "Should have exactly one subview (the label)")
                 
-                print("✅ \(colorName) menu item view properly initialized for \(status)")
+                StatusBarDebugger.shared.log(.verification, "Menu item view properly initialized", context: ["color": colorName, "status": "\(status)"])
                 
                 // Test dimensions based on type
                 if status == .success {
@@ -217,21 +214,21 @@ final class StatusBarManagerTests: XCTestCase {
                 }
             } else {
                 // In CI/headless mode, test status enum validity instead
-                print("🤖 Testing \(colorName) status enum logic for \(status)")
+                StatusBarDebugger.shared.log(.state, "Testing status enum logic", context: ["color": colorName, "status": "\(status)"])
                 
                 // Test that the status values are valid WorkflowRunStatus cases
                 XCTAssertTrue([.success, .failure, .running, .unknown].contains(status), 
                              "Status \(status) should be a valid WorkflowRunStatus case")
                 
-                print("✅ \(colorName) status enum validated for \(status)")
+                StatusBarDebugger.shared.log(.verification, "Status enum validated", context: ["color": colorName, "status": "\(status)"])
             }
         }
         
-        print("✅ All colored menu item view tests completed")
+        StatusBarDebugger.shared.log(.verification, "All colored menu item view tests completed")
     }
     
     func testColoredMenuItemViewProperties() {
-        print("\n=== COLORED MENU ITEM VIEW PROPERTIES TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "COLORED MENU ITEM VIEW PROPERTIES TEST")
         
         if TestEnvironment.shouldRunFullGUITests() {
             // Test header vs non-header items
@@ -249,12 +246,10 @@ final class StatusBarManagerTests: XCTestCase {
             XCTAssertEqual(regularView.intrinsicContentSize.width, 350, "Regular view should use standard width")
             XCTAssertEqual(buildView.intrinsicContentSize.width, 500, "Build view should use wider width")
             
-            print("✅ Header view dimensions: \(headerView.intrinsicContentSize)")
-            print("✅ Regular view dimensions: \(regularView.intrinsicContentSize)")
-            print("✅ Build view dimensions: \(buildView.intrinsicContentSize)")
+            StatusBarDebugger.shared.log(.verification, "View dimensions verified", context: ["header": "\(headerView.intrinsicContentSize)", "regular": "\(regularView.intrinsicContentSize)", "build": "\(buildView.intrinsicContentSize)"])
         } else {
             // In CI/headless mode, test the configuration logic
-            print("🤖 Testing menu item view configuration logic in headless mode")
+            StatusBarDebugger.shared.log(.state, "Testing menu item view configuration logic in headless mode")
             
             // Test that expected dimensions are constants we can validate
             let expectedStandardHeight = 24
@@ -266,14 +261,14 @@ final class StatusBarManagerTests: XCTestCase {
             XCTAssertGreaterThan(expectedStandardWidth, 0, "Standard width should be positive")
             XCTAssertGreaterThan(expectedBuildWidth, expectedStandardWidth, "Build width should be larger than standard width")
             
-            print("✅ Menu item view dimension constants validated")
+            StatusBarDebugger.shared.log(.verification, "Menu item view dimension constants validated")
         }
         
-        print("✅ Colored menu item view properties verified")
+        StatusBarDebugger.shared.log(.verification, "Colored menu item view properties verified")
     }
     
     func testMenuItemClickHandling() {
-        print("\n=== MENU ITEM CLICK HANDLING TEST ===")
+        StatusBarDebugger.shared.log(.lifecycle, "MENU ITEM CLICK HANDLING TEST")
         
         if TestEnvironment.shouldRunFullGUITests() {
             let menuItemView = ColoredMenuItemView(title: "Clickable Item", isHeader: false, status: .success)
@@ -289,11 +284,11 @@ final class StatusBarManagerTests: XCTestCase {
             XCTAssertTrue(menuItem.target === self, "Menu item target should be set")
             XCTAssertEqual(menuItem.action, #selector(dummyAction), "Menu item action should be set")
             
-            print("✅ Menu item click handling setup verified")
-            print("✅ Menu item association working")
+            StatusBarDebugger.shared.log(.verification, "Menu item click handling setup verified")
+            StatusBarDebugger.shared.log(.verification, "Menu item association working")
         } else {
             // In CI/headless mode, test the selector and action concepts
-            print("🤖 Testing menu item action concepts in headless mode")
+            StatusBarDebugger.shared.log(.state, "Testing menu item action concepts in headless mode")
             
             let action = #selector(dummyAction)
             XCTAssertNotNil(action, "Menu item action selector should be valid")
@@ -301,7 +296,7 @@ final class StatusBarManagerTests: XCTestCase {
             // Test that this test class responds to the dummy action
             XCTAssertTrue(self.responds(to: action), "Test class should respond to dummy action")
             
-            print("✅ Menu item action logic validated")
+            StatusBarDebugger.shared.log(.verification, "Menu item action logic validated")
         }
     }
     
