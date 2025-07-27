@@ -3,8 +3,12 @@ import Cocoa
 public class RepositorySettingsWindow: NSWindowController {
     
     private let repositoryManager = RepositoryManager()
-    private let gitHubClient = GitHubClient()
+    private let gitHubClient: GitHubClientProtocol
     private var monitoredRepositories: [MonitoredRepository] = []
+    
+    #if DEBUG
+    private var isTestMode = false
+    #endif
     
     // Main UI Elements
     private var tabView: NSTabView!
@@ -44,7 +48,8 @@ public class RepositorySettingsWindow: NSWindowController {
     private var tabAddButtons: [NSButton] = []
     private var monitoredRemoveButton: NSButton!
     
-    public init() {
+    public init(gitHubClient: GitHubClientProtocol = GitHubClient()) {
+        self.gitHubClient = gitHubClient
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1000, height: 800),
             styleMask: [.titled, .closable, .resizable],
@@ -850,6 +855,14 @@ public class RepositorySettingsWindow: NSWindowController {
     }
     
     private func loadPersonalRepositories() {
+        #if DEBUG
+        // Skip API calls in test mode - data should be set via setTestData()
+        if isTestMode {
+            StatusBarDebugger.shared.log(.state, "Test mode: Skipping loadPersonalRepositories API call")
+            return
+        }
+        #endif
+        
         showLoading(true)
         
         gitHubClient.getRepositories { [weak self] result in
@@ -871,6 +884,14 @@ public class RepositorySettingsWindow: NSWindowController {
     }
     
     private func loadUserOrganizations() {
+        #if DEBUG
+        // Skip API calls in test mode - data should be set via setTestData()
+        if isTestMode {
+            StatusBarDebugger.shared.log(.state, "Test mode: Skipping loadUserOrganizations API call")
+            return
+        }
+        #endif
+        
         gitHubClient.getUserOrganizations { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
@@ -1749,7 +1770,10 @@ extension RepositorySettingsWindow: NSTabViewDelegate {
     // MARK: - Testing Support Methods
     
     #if DEBUG
-    public func setTestData(monitoredRepositories: [MonitoredRepository]? = nil, searchResults: [Repository]? = nil) {
+    public func setTestData(monitoredRepositories: [MonitoredRepository]? = nil, searchResults: [Repository]? = nil, personalRepositories: [Repository]? = nil, organizations: [Organization]? = nil) {
+        // Enable test mode to prevent real API calls
+        isTestMode = true
+        
         // Ensure we're on the main thread for UI updates
         DispatchQueue.main.async { [weak self] in
             if let monitored = monitoredRepositories {
@@ -1764,6 +1788,31 @@ extension RepositorySettingsWindow: NSTabViewDelegate {
                 self?.searchResultsTable.reloadData()
                 StatusBarDebugger.shared.log(.state, "Test: Set search results", context: ["count": search.count])
                 StatusBarDebugger.shared.log(.state, "Test: searchResultsTable.numberOfRows after reload", context: ["rows": self?.searchResultsTable.numberOfRows ?? -1])
+            }
+            
+            if let personal = personalRepositories {
+                self?.personalRepositories = personal
+                self?.personalTableView.reloadData()
+                StatusBarDebugger.shared.log(.state, "Test: Set personal repositories", context: ["count": personal.count])
+                StatusBarDebugger.shared.log(.state, "Test: personalTableView.numberOfRows after reload", context: ["rows": self?.personalTableView.numberOfRows ?? -1])
+            }
+            
+            if let orgs = organizations {
+                self?.userOrganizations = orgs
+                self?.organizationsPopUp.removeAllItems()
+                
+                if orgs.isEmpty {
+                    self?.organizationsPopUp.addItem(withTitle: "No organizations")
+                    self?.organizationsPopUp.isEnabled = false
+                } else {
+                    self?.organizationsPopUp.addItem(withTitle: "Select organization...")
+                    for org in orgs {
+                        self?.organizationsPopUp.addItem(withTitle: org.login)
+                    }
+                    self?.organizationsPopUp.isEnabled = true
+                }
+                
+                StatusBarDebugger.shared.log(.state, "Test: Set organizations", context: ["count": orgs.count])
             }
             
             // Force layout update after data changes

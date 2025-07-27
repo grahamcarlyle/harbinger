@@ -2,9 +2,57 @@ import XCTest
 import Cocoa
 @testable import HarbingerCore
 
+// MARK: - Mock GitHub Client
+
+class MockGitHubClient: GitHubClientProtocol {
+    var mockPersonalRepositories: [Repository] = []
+    var mockOrganizations: [Organization] = []
+    var mockOrgRepositories: [Repository] = []
+    var mockWorkflows: WorkflowsResponse?
+    var mockSearchResults: RepositorySearchResponse?
+    
+    func getRepositories(completion: @escaping (Result<[Repository], GitHubClient.GitHubError>) -> Void) {
+        StatusBarDebugger.shared.log(.state, "MockGitHubClient: getRepositories called")
+        completion(.success(mockPersonalRepositories))
+    }
+    
+    func getUserOrganizations(completion: @escaping (Result<[Organization], GitHubClient.GitHubError>) -> Void) {
+        StatusBarDebugger.shared.log(.state, "MockGitHubClient: getUserOrganizations called")
+        completion(.success(mockOrganizations))
+    }
+    
+    func getOrganizationRepositories(org: String, completion: @escaping (Result<[Repository], GitHubClient.GitHubError>) -> Void) {
+        StatusBarDebugger.shared.log(.state, "MockGitHubClient: getOrganizationRepositories called", context: ["org": org])
+        completion(.success(mockOrgRepositories))
+    }
+    
+    func getWorkflows(owner: String, repo: String, completion: @escaping (Result<WorkflowsResponse, GitHubClient.GitHubError>) -> Void) {
+        StatusBarDebugger.shared.log(.state, "MockGitHubClient: getWorkflows called", context: ["owner": owner, "repo": repo])
+        if let workflows = mockWorkflows {
+            completion(.success(workflows))
+        } else {
+            completion(.success(WorkflowsResponse(totalCount: 0, workflows: [])))
+        }
+    }
+    
+    func searchPublicRepositories(query: String, sort: String, order: String, page: Int, perPage: Int, completion: @escaping (Result<RepositorySearchResponse, GitHubClient.GitHubError>) -> Void) {
+        StatusBarDebugger.shared.log(.state, "MockGitHubClient: searchPublicRepositories called", context: ["query": query])
+        if let searchResults = mockSearchResults {
+            completion(.success(searchResults))
+        } else {
+            completion(.success(RepositorySearchResponse(totalCount: 0, incompleteResults: false, items: [])))
+        }
+    }
+    
+    func clearAllCaches() {
+        StatusBarDebugger.shared.log(.state, "MockGitHubClient: clearAllCaches called")
+    }
+}
+
 final class RepositorySettingsWindowTests: XCTestCase {
     
     var settingsWindow: RepositorySettingsWindow!
+    var mockGitHubClient: MockGitHubClient!
     
     override class func setUp() {
         super.setUp()
@@ -22,7 +70,11 @@ final class RepositorySettingsWindowTests: XCTestCase {
         // Set up test-specific logging
         StatusBarDebugger.shared.setCurrentTest(self.name)
         
-        settingsWindow = RepositorySettingsWindow()
+        // Create mock GitHub client
+        mockGitHubClient = MockGitHubClient()
+        
+        // Inject mock client into settings window
+        settingsWindow = RepositorySettingsWindow(gitHubClient: mockGitHubClient)
         
         if TestEnvironment.shouldRunFullGUITests() {
             // Full GUI testing - show windows and make them key
@@ -363,15 +415,15 @@ final class RepositorySettingsWindowTests: XCTestCase {
     
     private func createMockRepositoryData() -> [MockRepository] {
         return [
-            MockRepository(name: "react", owner: "facebook", description: "A declarative, efficient, and flexible JavaScript library for building user interfaces.", language: "JavaScript", stars: 234567),
-            MockRepository(name: "vue", owner: "vuejs", description: "Vue.js is a progressive, incrementally-adoptable JavaScript framework for building UI on the web.", language: "TypeScript", stars: 198432),
+            MockRepository(name: "webapp", owner: "example-org", description: "A modern web application framework for building user interfaces.", language: "JavaScript", stars: 234567),
+            MockRepository(name: "ui-lib", owner: "open-source", description: "A progressive, incrementally-adoptable UI library for building modern web apps.", language: "TypeScript", stars: 198432),
             MockRepository(name: "angular", owner: "angular", description: "The modern web developer's platform. Angular is a platform for building mobile and desktop web applications.", language: "TypeScript", stars: 87654),
             MockRepository(name: "svelte", owner: "sveltejs", description: "Cybernetically enhanced web apps", language: "JavaScript", stars: 65432),
-            MockRepository(name: "swift", owner: "apple", description: "The Swift Programming Language", language: "Swift", stars: 58901),
+            MockRepository(name: "mobile-sdk", owner: "dev-tools", description: "Cross-platform mobile development SDK", language: "Swift", stars: 58901),
             MockRepository(name: "rust", owner: "rust-lang", description: "Empowering everyone to build reliable and efficient software.", language: "Rust", stars: 76543),
             MockRepository(name: "go", owner: "golang", description: "The Go programming language", language: "Go", stars: 109876),
             MockRepository(name: "python", owner: "python", description: "The Python programming language", language: "Python", stars: 45678),
-            MockRepository(name: "typescript", owner: "microsoft", description: "TypeScript is a superset of JavaScript that compiles to clean JavaScript output.", language: "TypeScript", stars: 87123),
+            MockRepository(name: "type-checker", owner: "lang-tools", description: "Static type checker for dynamic languages with modern tooling.", language: "TypeScript", stars: 87123),
             MockRepository(name: "harbinger", owner: "testuser", description: "macOS status bar app for monitoring GitHub Actions workflows", language: "Swift", stars: 42),
             MockRepository(name: "kubernetes", owner: "kubernetes", description: "Production-Grade Container Scheduling and Management", language: "Go", stars: 89123),
             MockRepository(name: "tensorflow", owner: "tensorflow", description: "An Open Source Machine Learning Framework for Everyone", language: "Python", stars: 156432),
@@ -464,12 +516,12 @@ final class RepositorySettingsWindowTests: XCTestCase {
         // Create test search results
         let testSearchResults = [
             Repository(
-                name: "react",
-                fullName: "facebook/react",
-                owner: RepositoryOwner(login: "facebook"),
+                name: "webapp",
+                fullName: "example-org/webapp",
+                owner: RepositoryOwner(login: "example-org"),
                 private: false,
-                htmlUrl: "https://github.com/facebook/react",
-                description: "The library for web and native user interfaces",
+                htmlUrl: "https://github.com/example-org/webapp",
+                description: "A modern web application framework for building user interfaces",
                 language: "JavaScript",
                 stargazersCount: 225000,
                 fork: false,
@@ -477,12 +529,12 @@ final class RepositorySettingsWindowTests: XCTestCase {
                 disabled: false
             ),
             Repository(
-                name: "vue",
-                fullName: "vuejs/vue",
-                owner: RepositoryOwner(login: "vuejs"),
+                name: "ui-lib",
+                fullName: "open-source/ui-lib",
+                owner: RepositoryOwner(login: "open-source"),
                 private: false,
-                htmlUrl: "https://github.com/vuejs/vue",
-                description: "Vue.js is a progressive, incrementally-adoptable JavaScript framework",
+                htmlUrl: "https://github.com/open-source/ui-lib",
+                description: "A progressive, incrementally-adoptable UI library for modern web apps",
                 language: "JavaScript",
                 stargazersCount: 207000,
                 fork: false,
@@ -491,7 +543,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
             )
         ]
         
-        // Set test data
+        // Set test data for search results (this test focuses on UI population, not API calls)
         settingsWindow.setTestData(searchResults: testSearchResults)
         
         // Allow UI to update
@@ -537,7 +589,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
             // Check first row data
             if let nameCell = tableView.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTableCellView,
                let nameTextField = nameCell.textField {
-                XCTAssertEqual(nameTextField.stringValue, "facebook/react", "First row name should be 'facebook/react'")
+                XCTAssertEqual(nameTextField.stringValue, "example-org/webapp", "First row name should be 'example-org/webapp'")
                 StatusBarDebugger.shared.log(.verification, "First row name", context: ["name": nameTextField.stringValue])
             } else {
                 StatusBarDebugger.shared.log(.error, "Could not get name cell for first row")
@@ -606,20 +658,46 @@ final class RepositorySettingsWindowTests: XCTestCase {
     }
 
     func testPersonalRepositoriesApiCall() {
-        // This test verifies that the Personal tab makes the correct API call to filter personal repos only
+        // This test verifies that the Personal tab displays personal repositories correctly using mock data
+        
+        // Create mock personal repositories data  
+        let mockPersonalRepos = [
+            Repository(
+                name: "project-alpha",
+                fullName: "testuser/project-alpha",
+                owner: RepositoryOwner(login: "testuser"),
+                private: false,
+                htmlUrl: "https://github.com/testuser/project-alpha",
+                description: "Personal project for alpha testing",
+                language: "Swift",
+                stargazersCount: 15,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "beta-tool",
+                fullName: "testuser/beta-tool",
+                owner: RepositoryOwner(login: "testuser"),
+                private: true,
+                htmlUrl: "https://github.com/testuser/beta-tool",
+                description: "Private development tool",
+                language: "Python",
+                stargazersCount: 8,
+                fork: false,
+                archived: false,
+                disabled: false
+            )
+        ]
+        
+        // Set mock data in the GitHub client - this ensures no real API calls
+        mockGitHubClient.mockPersonalRepositories = mockPersonalRepos
         
         // Switch to personal tab
         switchToTab(identifier: "personal")
         
         // Allow UI to update
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
-        
-        // The personal tab should have triggered a call to loadPersonalRepositories()
-        // which calls gitHubClient.getRepositories()
-        // This should make a request to /user/repos?type=owner to get only personal repos
-        
-        // We can't easily test the actual API call in a unit test without mocking the network layer,
-        // but we can at least verify that the personal tab is set up correctly and responds to tab switching
         
         guard let contentView = settingsWindow.window?.contentView,
               let tabView = findTabView(in: contentView) else {
@@ -637,9 +715,16 @@ final class RepositorySettingsWindowTests: XCTestCase {
         XCTAssertNotNil(personalTableView, "Personal tab should have a table view")
         StatusBarDebugger.shared.log(.verification, "Personal tab is correctly configured with table view")
         
-        // The actual filtering happens in GitHubClient.getRepositories() which now uses type=owner parameter
-        // This ensures only repositories owned by the authenticated user are returned, not org repos
-        StatusBarDebugger.shared.log(.verification, "Personal repositories API call configured to filter owner-only repositories")
+        // Verify that the mock data is displayed
+        XCTAssertEqual(personalTableView!.numberOfRows, 2, "Should display 2 mock personal repositories")
+        
+        // Check that the first repository data is correct
+        if let nameCell = personalTableView!.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTableCellView,
+           let nameTextField = nameCell.textField {
+            XCTAssertEqual(nameTextField.stringValue, "testuser/project-alpha", "First row should show first mock repository")
+        }
+        
+        StatusBarDebugger.shared.log(.verification, "Personal repositories mock data test completed successfully")
     }
 
     func testOptimizedWorkflowDetectionAndLoadingStates() {

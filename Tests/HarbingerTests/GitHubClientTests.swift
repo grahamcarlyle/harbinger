@@ -81,8 +81,8 @@ final class GitHubClientTests: XCTestCase {
     func testGetWorkflowsFromPublicRepo() throws {
         let expectation = XCTestExpectation(description: "Fetch workflows from public repo")
         
-        // Test against microsoft/TypeScript repository which has workflows
-        gitHubClient.getWorkflows(owner: "microsoft", repo: "TypeScript") { result in
+        // Test against nodejs/node repository which has workflows
+        gitHubClient.getWorkflows(owner: "nodejs", repo: "node") { result in
             switch result {
             case .success(let workflows):
                 XCTAssertGreaterThan(workflows.workflows.count, 0, "Should have at least one workflow")

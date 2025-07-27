@@ -1,6 +1,17 @@
 import Foundation
 
-public class GitHubClient {
+// MARK: - GitHubClientProtocol
+
+public protocol GitHubClientProtocol {
+    func getRepositories(completion: @escaping (Result<[Repository], GitHubClient.GitHubError>) -> Void)
+    func getUserOrganizations(completion: @escaping (Result<[Organization], GitHubClient.GitHubError>) -> Void)
+    func getOrganizationRepositories(org: String, completion: @escaping (Result<[Repository], GitHubClient.GitHubError>) -> Void)
+    func getWorkflows(owner: String, repo: String, completion: @escaping (Result<WorkflowsResponse, GitHubClient.GitHubError>) -> Void)
+    func searchPublicRepositories(query: String, sort: String, order: String, page: Int, perPage: Int, completion: @escaping (Result<RepositorySearchResponse, GitHubClient.GitHubError>) -> Void)
+    func clearAllCaches()
+}
+
+public class GitHubClient: GitHubClientProtocol {
     
     // MARK: - Properties
     
