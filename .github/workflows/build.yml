@@ -113,7 +113,22 @@ jobs:
         # Check for logs in Documents/HarbingerLogs (where StatusBarDebugger writes)
         HARBINGER_LOGS="$HOME/Documents/HarbingerLogs"
         if [ -d "$HARBINGER_LOGS" ]; then
+          # Copy all logs to logs directory
           cp -r "$HARBINGER_LOGS"/* logs/ 2>/dev/null || true
+          
+          # Create separate directories for different log types
+          mkdir -p logs/test-logs logs/app-logs
+          
+          # Separate test-specific logs from app logs
+          if ls "$HARBINGER_LOGS"/test_*.log >/dev/null 2>&1; then
+            cp "$HARBINGER_LOGS"/test_*.log logs/test-logs/ 2>/dev/null || true
+            echo "Found $(ls "$HARBINGER_LOGS"/test_*.log | wc -l) test-specific log files"
+          fi
+          
+          if ls "$HARBINGER_LOGS"/harbinger_*.log >/dev/null 2>&1; then
+            cp "$HARBINGER_LOGS"/harbinger_*.log logs/app-logs/ 2>/dev/null || true
+            echo "Found $(ls "$HARBINGER_LOGS"/harbinger_*.log | wc -l) app log files"
+          fi
         fi
         
         # Also check /tmp for any manual redirected logs
@@ -138,6 +153,14 @@ jobs:
       with:
         name: build-logs-${{ github.run_number }}
         path: logs/
+        retention-days: 90
+        
+    - name: Upload test-specific logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-logs-${{ github.run_number }}
+        path: logs/test-logs/
         retention-days: 90
         
     - name: Upload app bundle

@@ -7,11 +7,19 @@ final class GitHubAPITests: XCTestCase {
     
     override func setUp() {
         super.setUp()
+        
+        // Set up test-specific logging
+        StatusBarDebugger.shared.setCurrentTest(self.name)
+        
         gitHubClient = GitHubClient()
     }
     
     override func tearDown() {
         gitHubClient = nil
+        
+        // Clear test-specific logging
+        StatusBarDebugger.shared.clearCurrentTest()
+        
         super.tearDown()
     }
     

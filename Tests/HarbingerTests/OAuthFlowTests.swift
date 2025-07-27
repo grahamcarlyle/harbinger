@@ -25,6 +25,9 @@ final class OAuthFlowTests: XCTestCase {
     override func setUp() {
         super.setUp()
         
+        // Set up test-specific logging
+        StatusBarDebugger.shared.setCurrentTest(self.name)
+        
         // Store the original keychain service (will be the mock from class setup)
         originalKeychainService = GitHubOAuthConfig.keychainService
         
@@ -42,6 +45,9 @@ final class OAuthFlowTests: XCTestCase {
         
         // Restore the original keychain service
         GitHubOAuthConfig.keychainService = originalKeychainService
+        
+        // Clear test-specific logging
+        StatusBarDebugger.shared.clearCurrentTest()
         
         super.tearDown()
     }

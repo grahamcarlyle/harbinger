@@ -19,6 +19,9 @@ final class StatusBarManagerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         
+        // Set up test-specific logging
+        StatusBarDebugger.shared.setCurrentTest(self.name)
+        
         TestEnvironment.setupGraphicsContextIfNeeded()
         
         statusBarManager = StatusBarManager()
@@ -26,6 +29,10 @@ final class StatusBarManagerTests: XCTestCase {
     
     override func tearDown() {
         statusBarManager = nil
+        
+        // Clear test-specific logging
+        StatusBarDebugger.shared.clearCurrentTest()
+        
         super.tearDown()
     }
     

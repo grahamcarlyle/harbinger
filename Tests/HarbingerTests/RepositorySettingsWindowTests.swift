@@ -18,6 +18,10 @@ final class RepositorySettingsWindowTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
+        
+        // Set up test-specific logging
+        StatusBarDebugger.shared.setCurrentTest(self.name)
+        
         settingsWindow = RepositorySettingsWindow()
         
         if TestEnvironment.shouldRunFullGUITests() {
@@ -33,6 +37,10 @@ final class RepositorySettingsWindowTests: XCTestCase {
     override func tearDown() {
         settingsWindow.close()
         settingsWindow = nil
+        
+        // Clear test-specific logging
+        StatusBarDebugger.shared.clearCurrentTest()
+        
         super.tearDown()
     }
     

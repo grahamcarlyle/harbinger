@@ -10,6 +10,8 @@ public class StatusBarDebugger {
     private var debugLog: [DebugEntry] = []
     private let maxLogEntries = 1000
     private let logFileURL: URL
+    private var currentTestLogFileURL: URL?
+    private var currentTestName: String?
     
     // Control whether to output to console (can be disabled during tests)
     // Auto-detect test environment and disable console logging by default in tests
@@ -27,6 +29,67 @@ public class StatusBarDebugger {
     // Convenience method to re-enable console logging
     public func enableConsoleLogging() {
         consoleLoggingEnabled = true
+    }
+    
+    // MARK: - Test-Specific Logging
+    
+    /// Set the current test name for test-specific logging
+    /// - Parameter testName: The test name from XCTestCase.name (format: "-[ClassName testMethod]")
+    public func setCurrentTest(_ testName: String) {
+        currentTestName = extractTestMethodName(from: testName)
+        createTestSpecificLogFile()
+    }
+    
+    /// Clear the current test context and return to unified logging
+    public func clearCurrentTest() {
+        if let testName = currentTestName, let testLogURL = currentTestLogFileURL {
+            writeToLogFile("=== TEST END: \(testName) ===", to: testLogURL)
+        }
+        currentTestName = nil
+        currentTestLogFileURL = nil
+    }
+    
+    /// Extract clean test method name from XCTestCase.name format
+    /// - Parameter testName: Format like "-[StatusBarManagerTests testStatusIconCreation]"
+    /// - Returns: Clean method name like "testStatusIconCreation"
+    private func extractTestMethodName(from testName: String) -> String {
+        // Parse "-[ClassName testMethodName]" to extract "testMethodName"
+        let pattern = #"-\[.*\s(.+)\]"#
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: testName, range: NSRange(testName.startIndex..., in: testName)),
+           let range = Range(match.range(at: 1), in: testName) {
+            return String(testName[range])
+        }
+        
+        // Fallback: just use the test name with invalid characters removed
+        return testName.replacingOccurrences(of: "[", with: "")
+                      .replacingOccurrences(of: "]", with: "")
+                      .replacingOccurrences(of: "-", with: "")
+                      .replacingOccurrences(of: " ", with: "_")
+    }
+    
+    /// Create a test-specific log file
+    private func createTestSpecificLogFile() {
+        guard let testName = currentTestName else { return }
+        
+        // Create logs directory
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let logsDirectory = documentsPath.appendingPathComponent("HarbingerLogs")
+        try? FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
+        
+        // Create test-specific log file with timestamp
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "HH-mm-ss"
+        let timestamp = dateFormatter.string(from: Date())
+        currentTestLogFileURL = logsDirectory.appendingPathComponent("test_\(testName)_\(timestamp).log")
+        
+        // Write test header
+        if let testLogURL = currentTestLogFileURL {
+            writeToLogFile("=== TEST START: \(testName) ===", to: testLogURL)
+            writeToLogFile("Test started: \(Date())", to: testLogURL)
+            writeToLogFile("Log file: \(testLogURL.path)", to: testLogURL)
+            writeToLogFile("=====================================\n", to: testLogURL)
+        }
     }
     
     private init() {
@@ -114,20 +177,21 @@ public class StatusBarDebugger {
         writeToLogFile(formattedOutput)
     }
     
-    private func writeToLogFile(_ message: String) {
+    private func writeToLogFile(_ message: String, to url: URL? = nil) {
+        let targetURL = url ?? (currentTestLogFileURL ?? logFileURL)
         let logEntry = "\(message)\n"
         
         if let data = logEntry.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: logFileURL.path) {
+            if FileManager.default.fileExists(atPath: targetURL.path) {
                 // Append to existing file
-                if let fileHandle = try? FileHandle(forWritingTo: logFileURL) {
+                if let fileHandle = try? FileHandle(forWritingTo: targetURL) {
                     fileHandle.seekToEndOfFile()
                     fileHandle.write(data)
                     fileHandle.closeFile()
                 }
             } else {
                 // Create new file
-                try? data.write(to: logFileURL)
+                try? data.write(to: targetURL)
             }
         }
     }

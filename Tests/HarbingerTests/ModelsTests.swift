@@ -3,6 +3,20 @@ import XCTest
 
 final class ModelsTests: XCTestCase {
     
+    override func setUp() {
+        super.setUp()
+        
+        // Set up test-specific logging
+        StatusBarDebugger.shared.setCurrentTest(self.name)
+    }
+    
+    override func tearDown() {
+        // Clear test-specific logging
+        StatusBarDebugger.shared.clearCurrentTest()
+        
+        super.tearDown()
+    }
+    
     // MARK: - WorkflowRun Model Tests
     
     func testWorkflowRunModelDecoding() throws {

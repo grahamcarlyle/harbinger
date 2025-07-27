@@ -7,11 +7,19 @@ final class AuthManagerTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
+        
+        // Set up test-specific logging
+        StatusBarDebugger.shared.setCurrentTest(self.name)
+        
         authManager = AuthManager()
     }
     
     override func tearDown() {
         authManager = nil
+        
+        // Clear test-specific logging
+        StatusBarDebugger.shared.clearCurrentTest()
+        
         super.tearDown()
     }
     
