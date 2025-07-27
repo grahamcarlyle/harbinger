@@ -7,14 +7,16 @@ public class ColoredMenuItemView: NSView {
     private let status: WorkflowRunStatus?
     private let isHeader: Bool
     private let isBuildEntry: Bool
+    private let isRepositoryHeader: Bool
     private weak var menuItem: NSMenuItem?
     public private(set) var isHovered: Bool = false
     
     
-    public init(title: String, isHeader: Bool, status: WorkflowRunStatus?, isBuildEntry: Bool = false) {
+    public init(title: String, isHeader: Bool, status: WorkflowRunStatus?, isBuildEntry: Bool = false, isRepositoryHeader: Bool = false) {
         self.status = status
         self.isHeader = isHeader
         self.isBuildEntry = isBuildEntry
+        self.isRepositoryHeader = isRepositoryHeader
         let width = isBuildEntry ? 500 : 350
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: 24))
         
@@ -68,7 +70,9 @@ public class ColoredMenuItemView: NSView {
         
         // Set font based on whether it's a header
         if isHeader {
-            titleLabel.font = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
+            // Repository headers get slightly larger font for better hierarchy
+            let fontSize = isRepositoryHeader ? NSFont.systemFontSize + 1 : NSFont.systemFontSize
+            titleLabel.font = NSFont.boldSystemFont(ofSize: fontSize)
         } else {
             // Enhanced emphasis for failures
             let fontSize = NSFont.systemFontSize
@@ -200,20 +204,26 @@ public class ColoredMenuItemView: NSView {
         var backgroundColor: NSColor = .controlBackgroundColor
         
         if let status = status {
+            // Repository headers get enhanced background for visual separation
+            let alphaMultiplier: CGFloat = isRepositoryHeader ? 1.5 : 1.0
+            
             switch status {
             case .failure:
                 // Enhanced failure visibility with subtle red background
-                backgroundColor = NSColor.systemRed.withAlphaComponent(0.12)
+                backgroundColor = NSColor.systemRed.withAlphaComponent(0.12 * alphaMultiplier)
             case .success:
                 // Subtle green hint for success
-                backgroundColor = NSColor.systemGreen.withAlphaComponent(0.08)
+                backgroundColor = NSColor.systemGreen.withAlphaComponent(0.08 * alphaMultiplier)
             case .running:
                 // Subtle yellow hint for in-progress
-                backgroundColor = NSColor.systemYellow.withAlphaComponent(0.08)
+                backgroundColor = NSColor.systemYellow.withAlphaComponent(0.08 * alphaMultiplier)
             case .unknown:
-                // Default menu background
-                backgroundColor = .controlBackgroundColor
+                // Repository headers get subtle background even for unknown status
+                backgroundColor = isRepositoryHeader ? NSColor.controlAccentColor.withAlphaComponent(0.05) : .controlBackgroundColor
             }
+        } else if isRepositoryHeader {
+            // Repository headers without status still get subtle background
+            backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.05)
         }
         
         // Enhanced hover effect with better contrast
@@ -228,6 +238,17 @@ public class ColoredMenuItemView: NSView {
         
         backgroundColor.setFill()
         fillRect.fill()
+        
+        // Add top border for repository headers to create visual separation
+        if isRepositoryHeader {
+            let topBorderColor = NSColor.separatorColor.withAlphaComponent(0.6)
+            topBorderColor.setStroke()
+            let topBorder = NSBezierPath()
+            topBorder.move(to: NSPoint(x: 0, y: fillRect.height - 0.5))
+            topBorder.line(to: NSPoint(x: fillRect.width, y: fillRect.height - 0.5))
+            topBorder.lineWidth = 1.0
+            topBorder.stroke()
+        }
         
         // Add status indicator border for enhanced visibility
         if let status = status {
@@ -556,7 +577,7 @@ public class StatusBarManager: NSObject {
     private func addRepositoryStatusToMenu(_ repoStatus: RepositoryWorkflowStatus) {
         // Repository header - clickable to open repo (status shown via background/text color)
         let repoTitle = "\(repoStatus.repository.displayName)"
-        let repoItem = createHeaderMenuItem(title: repoTitle, action: #selector(openRepositoryURL(_:)), url: repoStatus.repository.url, status: repoStatus.overallStatus)
+        let repoItem = createHeaderMenuItem(title: repoTitle, action: #selector(openRepositoryURL(_:)), url: repoStatus.repository.url, status: repoStatus.overallStatus, isRepositoryHeader: true)
         menu?.addItem(repoItem)
         
         // Group workflows by name to show recent runs for each
@@ -590,7 +611,7 @@ public class StatusBarManager: NSObject {
         return "        \(run.truncatedCommitMessage) • \(run.displayAuthor) • \(run.formattedTimestamp) • \(run.shortCommitSha)"
     }
     
-    private func createHeaderMenuItem(title: String, action: Selector? = nil, url: String? = nil, status: WorkflowRunStatus? = nil) -> NSMenuItem {
+    private func createHeaderMenuItem(title: String, action: Selector? = nil, url: String? = nil, status: WorkflowRunStatus? = nil, isRepositoryHeader: Bool = false) -> NSMenuItem {
         let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
         
         if action != nil {
@@ -599,7 +620,7 @@ public class StatusBarManager: NSObject {
         }
         
         // Create custom view for solid background - use wider width for headers
-        let customView = ColoredMenuItemView(title: title, isHeader: true, status: status, isBuildEntry: true)
+        let customView = ColoredMenuItemView(title: title, isHeader: true, status: status, isBuildEntry: true, isRepositoryHeader: isRepositoryHeader)
         customView.setMenuItem(item)
         item.view = customView
         
