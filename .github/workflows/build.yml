@@ -110,8 +110,15 @@ jobs:
         mkdir -p logs
         
         # Capture any harbinger logs if they exist
+        # Check for logs in Documents/HarbingerLogs (where StatusBarDebugger writes)
+        HARBINGER_LOGS="$HOME/Documents/HarbingerLogs"
+        if [ -d "$HARBINGER_LOGS" ]; then
+          cp -r "$HARBINGER_LOGS"/* logs/ 2>/dev/null || true
+        fi
+        
+        # Also check /tmp for any manual redirected logs
         if [ -f /tmp/harbinger.log ]; then
-          cp /tmp/harbinger.log logs/
+          cp /tmp/harbinger.log logs/harbinger-manual.log
         fi
         
         # Create build summary
