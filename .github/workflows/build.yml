@@ -60,10 +60,17 @@ jobs:
         # Make executable
         chmod +x Harbinger.app/Contents/MacOS/Harbinger
         
+        # Set version variables
+        VERSION="1.0.0"
+        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          VERSION="${GITHUB_REF#refs/tags/v}"
+        fi
+        BUILD_NUMBER="$GITHUB_RUN_NUMBER"
+        
         # Create Info.plist for release
-        cat > Harbinger.app/Contents/Info.plist << 'EOF'
+        cat > Harbinger.app/Contents/Info.plist << EOF
         <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>CFBundleDisplayName</key>
@@ -77,9 +84,9 @@ jobs:
             <key>CFBundlePackageType</key>
             <string>APPL</string>
             <key>CFBundleShortVersionString</key>
-            <string>${GITHUB_REF_NAME#v}</string>
+            <string>${VERSION}</string>
             <key>CFBundleVersion</key>
-            <string>${GITHUB_RUN_NUMBER}</string>
+            <string>${BUILD_NUMBER}</string>
             <key>LSUIElement</key>
             <true/>
             <key>NSHighResolutionCapable</key>
@@ -141,22 +148,22 @@ jobs:
           Harbinger.zip
         body: |
           ## Harbinger macOS App
-          
+
           ### Installation Instructions
           1. Download `Harbinger.zip` from the assets below
           2. Extract the ZIP file to get `Harbinger.app`
           3. Right-click on `Harbinger.app` and select "Open" (to bypass Gatekeeper warning)
           4. Optionally move `Harbinger.app` to your Applications folder
-          
+
           ### What's New
           - Built from commit ${{ github.sha }}
           - All 77 tests passing
           - Clean logging system with structured debug output
-          
+
           ### Requirements
           - macOS 13.0 or later
           - Internet connection for GitHub API access
-          
+
           **Note**: This is an unsigned build for personal use. You may see a security warning on first launch - this is normal for unsigned apps.
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
