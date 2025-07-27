@@ -53,8 +53,10 @@ final class StatusBarManagerTests: XCTestCase {
                 
                 // Test icon properties in full GUI mode
                 XCTAssertNotNil(icon, "Status icon should be created for \(status)")
-                XCTAssertEqual(icon.size, NSSize(width: 18, height: 18), "Icon should have correct size")
-                XCTAssertFalse(icon.isTemplate, "Icon should not be template to show colors")
+                // SF Symbols have variable sizes, just ensure they're reasonable
+                XCTAssertGreaterThan(icon.size.width, 0, "Icon should have positive width")
+                XCTAssertGreaterThan(icon.size.height, 0, "Icon should have positive height")
+                XCTAssertTrue(icon.isTemplate, "Icon should be template for proper theme support")
                 XCTAssertTrue(icon.representations.count > 0, "Icon should have image representations")
                 
                 StatusBarDebugger.shared.log(.verification, "Icon created successfully", context: ["color": colorName, "status": "\(status)"])
@@ -143,10 +145,10 @@ final class StatusBarManagerTests: XCTestCase {
         
         let passingIcon = statusBarManager.createStatusIcon(for: .passing)
         
-        // Test detailed icon properties
-        XCTAssertEqual(passingIcon.size.width, 18, "Icon width should be 18")
-        XCTAssertEqual(passingIcon.size.height, 18, "Icon height should be 18")
-        XCTAssertFalse(passingIcon.isTemplate, "Icon should not be template to preserve colors")
+        // Test detailed icon properties (Apple HIG compliant SF Symbols)
+        XCTAssertGreaterThan(passingIcon.size.width, 0, "Icon should have positive width")
+        XCTAssertGreaterThan(passingIcon.size.height, 0, "Icon should have positive height")
+        XCTAssertTrue(passingIcon.isTemplate, "Icon should be template for proper theme support")
         XCTAssertTrue(passingIcon.representations.count > 0, "Icon should have content")
         
         StatusBarDebugger.shared.log(.verification, "Status icon properties verified", context: ["size": "\(passingIcon.size)", "template": "\(passingIcon.isTemplate)", "representations": "\(passingIcon.representations.count)"])
@@ -175,8 +177,9 @@ final class StatusBarManagerTests: XCTestCase {
             // Verify the icon can be created for this status
             let icon = statusBarManager.createStatusIcon(for: internalStatus)
             XCTAssertNotNil(icon, "Should create icon for \(status) → \(internalStatus)")
-            XCTAssertFalse(icon.isTemplate, "Icon should preserve colors for \(status)")
-            XCTAssertEqual(icon.size, NSSize(width: 18, height: 18), "Icon should have correct size for \(status)")
+            XCTAssertTrue(icon.isTemplate, "Icon should be template for \(status)")
+            XCTAssertGreaterThan(icon.size.width, 0, "Icon should have positive width for \(status)")
+            XCTAssertGreaterThan(icon.size.height, 0, "Icon should have positive height for \(status)")
             
             StatusBarDebugger.shared.log(.verification, "Status update flow works", context: ["workflowStatus": "\(status)", "internalStatus": "\(internalStatus)"])
         }
