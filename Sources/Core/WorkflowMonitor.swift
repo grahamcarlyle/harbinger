@@ -242,7 +242,7 @@ public class WorkflowMonitor {
         
         guard !repositories.isEmpty else {
             StatusBarDebugger.shared.log(.lifecycle, "WorkflowMonitor: No repositories to monitor")
-            delegate?.workflowMonitor(self, didUpdateOverallStatus: .unknown, statusText: "No repositories monitored")
+            delegate?.workflowMonitor(self, didUpdateOverallStatus: .unknown, statusText: "No repositories monitored", lastCompletedStatus: nil)
             return
         }
         
@@ -264,11 +264,11 @@ public class WorkflowMonitor {
             guard let self = self else { return }
             
             self.statusCache = newStatusCache
-            let overallStatus = self.calculateOverallStatus()
+            let (overallStatus, lastCompletedStatus) = self.calculateOverallStatus()
             let statusText = self.generateOverallStatusText()
             
-            StatusBarDebugger.shared.log(.network, "Completed refresh", context: ["overallStatus": "\(overallStatus)"])
-            self.delegate?.workflowMonitor(self, didUpdateOverallStatus: overallStatus, statusText: statusText)
+            StatusBarDebugger.shared.log(.network, "Completed refresh", context: ["overallStatus": "\(overallStatus)", "lastCompleted": "\(String(describing: lastCompletedStatus))"])
+            self.delegate?.workflowMonitor(self, didUpdateOverallStatus: overallStatus, statusText: statusText, lastCompletedStatus: lastCompletedStatus)
         }
     }
     
@@ -277,7 +277,8 @@ public class WorkflowMonitor {
     }
     
     public func getOverallStatus() -> (status: WorkflowRunStatus, text: String) {
-        return (calculateOverallStatus(), generateOverallStatusText())
+        let (status, _) = calculateOverallStatus()
+        return (status, generateOverallStatusText())
     }
     
     // MARK: - Private Methods
@@ -334,34 +335,56 @@ public class WorkflowMonitor {
         }
     }
     
-    private func calculateOverallStatus() -> WorkflowRunStatus {
+    private func calculateOverallStatus() -> (status: WorkflowRunStatus, lastCompleted: WorkflowRunStatus?) {
         let allStatuses = statusCache.values
         
-        guard !allStatuses.isEmpty else { return .unknown }
+        guard !allStatuses.isEmpty else { return (.unknown, nil) }
         
         // If any repository has an error, but others are working, show the working status
         let workingStatuses = allStatuses.filter { $0.error == nil }
         
         if workingStatuses.isEmpty {
-            return .unknown // All repositories have errors
+            return (.unknown, nil) // All repositories have errors
         }
         
         // Check for failures first
         if workingStatuses.contains(where: { $0.overallStatus == .failure }) {
-            return .failure
+            return (.failure, nil)
         }
         
-        // Check for running workflows
+        // Check for running workflows - if any are running, determine last completed status
         if workingStatuses.contains(where: { $0.overallStatus == .running }) {
-            return .running
+            let lastCompletedStatus = calculateLastCompletedStatus(from: workingStatuses)
+            return (.running, lastCompletedStatus)
         }
         
         // Check if all working repositories are successful
         if workingStatuses.allSatisfy({ $0.overallStatus == .success }) {
-            return .success
+            return (.success, nil)
         }
         
-        return .unknown
+        return (.unknown, nil)
+    }
+    
+    private func calculateLastCompletedStatus(from statuses: [RepositoryWorkflowStatus]) -> WorkflowRunStatus? {
+        // Look through all repositories for the most recent completed workflow
+        var lastCompletedRun: WorkflowRunSummary?
+        var lastCompletedTime: Date?
+        
+        for repoStatus in statuses {
+            // Find the most recent completed (non-running) workflow in this repository
+            for workflow in repoStatus.workflows {
+                if workflow.status != .running {
+                    // This is a completed workflow, check if it's the most recent overall
+                    if lastCompletedTime == nil || workflow.updatedAt > lastCompletedTime! {
+                        lastCompletedRun = workflow
+                        lastCompletedTime = workflow.updatedAt
+                    }
+                }
+            }
+        }
+        
+        return lastCompletedRun?.status
     }
     
     private func generateOverallStatusText() -> String {
@@ -372,7 +395,7 @@ public class WorkflowMonitor {
             return "No repositories monitored"
         }
         
-        let overallStatus = calculateOverallStatus()
+        let (overallStatus, _) = calculateOverallStatus()
         
         switch overallStatus {
         case .success:
@@ -399,6 +422,6 @@ public class WorkflowMonitor {
 // MARK: - Delegate Protocol
 
 public protocol WorkflowMonitorDelegate: AnyObject {
-    func workflowMonitor(_ monitor: WorkflowMonitor, didUpdateOverallStatus status: WorkflowRunStatus, statusText: String)
+    func workflowMonitor(_ monitor: WorkflowMonitor, didUpdateOverallStatus status: WorkflowRunStatus, statusText: String, lastCompletedStatus: WorkflowRunStatus?)
     func workflowMonitor(_ monitor: WorkflowMonitor, didUpdateRepository repositoryStatus: RepositoryWorkflowStatus)
 }

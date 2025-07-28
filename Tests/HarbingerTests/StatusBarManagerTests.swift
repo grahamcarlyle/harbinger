@@ -56,7 +56,10 @@ final class StatusBarManagerTests: XCTestCase {
                 // SF Symbols have variable sizes, just ensure they're reasonable
                 XCTAssertGreaterThan(icon.size.width, 0, "Icon should have positive width")
                 XCTAssertGreaterThan(icon.size.height, 0, "Icon should have positive height")
-                XCTAssertTrue(icon.isTemplate, "Icon should be template for proper theme support")
+                // Only untinted icons should be template images for theme support
+                // Tinted icons (failing, running, combined) are pre-tinted for better visibility
+                let shouldBeTemplate = (status == .unknown || status == .passing)
+                XCTAssertEqual(icon.isTemplate, shouldBeTemplate, "Icon template property should match expected behavior for \(status)")
                 XCTAssertTrue(icon.representations.count > 0, "Icon should have image representations")
                 
                 StatusBarDebugger.shared.log(.verification, "Icon created successfully", context: ["color": colorName, "status": "\(status)"])
@@ -83,7 +86,9 @@ final class StatusBarManagerTests: XCTestCase {
             (.passing, .systemGreen, "Green"),
             (.failing, .systemRed, "Red"),
             (.running, .systemYellow, "Yellow"),
-            (.unknown, .systemGray, "Gray")
+            (.unknown, .systemGray, "Gray"),
+            (.runningAfterSuccess, .systemYellow, "Yellow"),
+            (.runningAfterFailure, .systemOrange, "Orange")
         ]
         
         for (status, expectedColor, colorName) in testCases {
@@ -98,6 +103,10 @@ final class StatusBarManagerTests: XCTestCase {
                 color = NSColor.systemRed
             case .running:
                 color = NSColor.systemYellow
+            case .runningAfterSuccess:
+                color = NSColor.systemYellow
+            case .runningAfterFailure:
+                color = NSColor.systemOrange
             }
             
             XCTAssertEqual(color, expectedColor, "Status \(status) should map to \(colorName) color")
@@ -177,7 +186,12 @@ final class StatusBarManagerTests: XCTestCase {
             // Verify the icon can be created for this status
             let icon = statusBarManager.createStatusIcon(for: internalStatus)
             XCTAssertNotNil(icon, "Should create icon for \(status) → \(internalStatus)")
-            XCTAssertTrue(icon.isTemplate, "Icon should be template for \(status)")
+            
+            // Only untinted icons should be template images for theme support
+            // Tinted icons (failing, running) are pre-tinted for better visibility
+            let shouldBeTemplate = (internalStatus == .unknown || internalStatus == .passing)
+            XCTAssertEqual(icon.isTemplate, shouldBeTemplate, "Icon template property should match expected behavior for \(internalStatus)")
+            
             XCTAssertGreaterThan(icon.size.width, 0, "Icon should have positive width for \(status)")
             XCTAssertGreaterThan(icon.size.height, 0, "Icon should have positive height for \(status)")
             

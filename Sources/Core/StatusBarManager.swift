@@ -351,6 +351,9 @@ public class StatusBarManager: NSObject {
         case passing
         case failing
         case running
+        // Combined states: running + last completed status
+        case runningAfterSuccess    // Currently running, last completed was success
+        case runningAfterFailure    // Currently running, last completed was failure
     }
     
     private var currentStatus: WorkflowStatus = .unknown
@@ -671,44 +674,100 @@ public class StatusBarManager: NSObject {
     }
     
     public func createStatusIcon(for status: WorkflowStatus) -> NSImage {
-        // Use SF Symbols for Apple HIG compliance
-        let symbolName: String
         switch status {
         case .unknown:
-            symbolName = "questionmark.circle"
+            return createSimpleStatusIcon(symbolName: "questionmark.circle", tintColor: nil, status: status)
         case .passing:
-            symbolName = "checkmark.circle"
+            return createSimpleStatusIcon(symbolName: "checkmark.circle", tintColor: nil, status: status)
         case .failing:
-            symbolName = "xmark.circle"
+            return createSimpleStatusIcon(symbolName: "xmark.circle", tintColor: .systemRed, status: status)
         case .running:
-            symbolName = "hourglass"
+            return createSimpleStatusIcon(symbolName: "hourglass", tintColor: .systemYellow, status: status)
+        case .runningAfterSuccess:
+            return createCombinedStatusIcon(runningIcon: "hourglass", backgroundIcon: "checkmark.circle", 
+                                          tintColor: .systemYellow, status: status)
+        case .runningAfterFailure:
+            return createCombinedStatusIcon(runningIcon: "hourglass", backgroundIcon: "xmark.circle", 
+                                          tintColor: .systemOrange, status: status) // Orange indicates running after failure
         }
-        
+    }
+    
+    private func createSimpleStatusIcon(symbolName: String, tintColor: NSColor?, status: WorkflowStatus) -> NSImage {
         // Create template image that adapts to system theme
         let description = "\(status)"
-        guard let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) else {
+        guard let baseImage = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) else {
             // Fallback to simple circle if SF Symbol unavailable
             return createFallbackStatusIcon(for: status)
         }
         
-        // Configure as template image for proper dark mode support
+        // If no tint color specified, return template image for system theming
+        guard let tintColor = tintColor else {
+            baseImage.isTemplate = true
+            return baseImage
+        }
+        
+        // Create pre-tinted image to ensure visibility
+        let size = NSSize(width: 18, height: 18)
+        let tintedImage = NSImage(size: size)
+        
+        tintedImage.lockFocus()
+        
+        // Clear background
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        
+        // Draw the base image
+        let imageRect = NSRect(x: 0, y: 0, width: size.width, height: size.height)
+        baseImage.draw(in: imageRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        
+        // Apply tint color overlay
+        tintColor.setFill()
+        imageRect.fill(using: .sourceAtop)
+        
+        tintedImage.unlockFocus()
+        
+        // Keep as template for dark mode support but with pre-applied color
+        tintedImage.isTemplate = false
+        
+        return tintedImage
+    }
+    
+    private func createCombinedStatusIcon(runningIcon: String, backgroundIcon: String, tintColor: NSColor, status: WorkflowStatus) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        
+        image.lockFocus()
+        
+        // Clear background
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        
+        // Draw background status (last completed) at reduced opacity
+        if let backgroundImage = NSImage(systemSymbolName: backgroundIcon, accessibilityDescription: "background") {
+            backgroundImage.isTemplate = true
+            
+            // Draw background icon with reduced opacity to show last status
+            let backgroundRect = NSRect(x: 0, y: 0, width: size.width, height: size.height)
+            backgroundImage.draw(in: backgroundRect, from: .zero, operation: .sourceOver, fraction: 0.3)
+        }
+        
+        // Draw running indicator (smaller, in corner) 
+        if let runningImage = NSImage(systemSymbolName: runningIcon, accessibilityDescription: "running") {
+            runningImage.isTemplate = true
+            
+            // Draw running icon smaller in the top-right corner
+            let runningSize = NSSize(width: size.width * 0.6, height: size.height * 0.6)
+            let runningRect = NSRect(x: size.width - runningSize.width, y: size.height - runningSize.height, 
+                                   width: runningSize.width, height: runningSize.height)
+            runningImage.draw(in: runningRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        }
+        
+        image.unlockFocus()
         image.isTemplate = true
         
-        // Apply critical tinting to status bar button for failures
+        // Apply combined tinting
         DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            switch status {
-            case .failing:
-                // Red tint for critical failures - highly visible
-                self.statusItem?.button?.contentTintColor = .systemRed
-            case .running:
-                // Yellow tint for in-progress builds
-                self.statusItem?.button?.contentTintColor = .systemYellow
-            case .passing, .unknown:
-                // No tint - use system default (adapts to theme)
-                self.statusItem?.button?.contentTintColor = nil
-            }
+            self?.statusItem?.button?.contentTintColor = tintColor
         }
         
         return image
@@ -745,6 +804,10 @@ public class StatusBarManager: NSObject {
             return "Harbinger: Some workflows failing"
         case .running:
             return "Harbinger: Workflows running"
+        case .runningAfterSuccess:
+            return "Harbinger: Running (last build passed)"
+        case .runningAfterFailure:
+            return "Harbinger: Running (last build failed)"
         }
     }
     
@@ -1136,8 +1199,8 @@ extension StatusBarManager: NSWindowDelegate {
 
 extension StatusBarManager: WorkflowMonitorDelegate {
     
-    public func workflowMonitor(_ monitor: WorkflowMonitor, didUpdateOverallStatus status: WorkflowRunStatus, statusText: String) {
-        debugger.log(.network, "Received overall status update", context: ["status": "\(status)", "text": statusText])
+    public func workflowMonitor(_ monitor: WorkflowMonitor, didUpdateOverallStatus status: WorkflowRunStatus, statusText: String, lastCompletedStatus: WorkflowRunStatus?) {
+        debugger.log(.network, "Received overall status update", context: ["status": "\(status)", "text": statusText, "lastCompleted": "\(String(describing: lastCompletedStatus))"])
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
@@ -1153,12 +1216,28 @@ extension StatusBarManager: WorkflowMonitorDelegate {
             case .failure:
                 internalStatus = .failing
             case .running:
-                internalStatus = .running
+                // If running and we have last completed status, use combined state
+                if let lastCompleted = lastCompletedStatus {
+                    switch lastCompleted {
+                    case .success:
+                        internalStatus = .runningAfterSuccess
+                    case .failure:
+                        internalStatus = .runningAfterFailure
+                    default:
+                        internalStatus = .running
+                    }
+                } else {
+                    internalStatus = .running
+                }
             case .unknown:
                 internalStatus = .unknown
             }
             
-            self.debugger.log(.state, "Converting status for icon update", context: ["input": "\(status)", "internal": "\(internalStatus)"])
+            self.debugger.log(.state, "Converting status for icon update", context: [
+                "input": "\(status)", 
+                "internal": "\(internalStatus)",
+                "lastCompleted": "\(String(describing: lastCompletedStatus))"
+            ])
             
             // Update the status icon
             self.updateStatusIcon(internalStatus)
