@@ -6,9 +6,6 @@ public class RepositorySettingsWindow: NSWindowController {
     private let gitHubClient: GitHubClientProtocol
     private var monitoredRepositories: [MonitoredRepository] = []
     
-    #if DEBUG
-    private var isTestMode = false
-    #endif
     
     // Main UI Elements
     private var tabView: NSTabView!
@@ -855,14 +852,6 @@ public class RepositorySettingsWindow: NSWindowController {
     }
     
     private func loadPersonalRepositories() {
-        #if DEBUG
-        // Skip API calls in test mode - data should be set via setTestData()
-        if isTestMode {
-            StatusBarDebugger.shared.log(.state, "Test mode: Skipping loadPersonalRepositories API call")
-            return
-        }
-        #endif
-        
         showLoading(true)
         
         gitHubClient.getRepositories { [weak self] result in
@@ -884,27 +873,30 @@ public class RepositorySettingsWindow: NSWindowController {
     }
     
     private func loadUserOrganizations() {
-        #if DEBUG
-        // Skip API calls in test mode - data should be set via setTestData()
-        if isTestMode {
-            StatusBarDebugger.shared.log(.state, "Test mode: Skipping loadUserOrganizations API call")
-            return
-        }
-        #endif
-        
+        StatusBarDebugger.shared.log(.network, "🔄 Starting loadUserOrganizations")
         gitHubClient.getUserOrganizations { [weak self] result in
+            StatusBarDebugger.shared.log(.network, "📡 getUserOrganizations callback received")
             DispatchQueue.main.async {
+                StatusBarDebugger.shared.log(.network, "🎯 In main dispatch queue for organizations update")
                 switch result {
                 case .success(let organizations):
+                    StatusBarDebugger.shared.log(.network, "✅ Organizations success", context: [
+                        "count": "\(organizations.count)",
+                        "orgs": organizations.map { $0.login }
+                    ])
+                    
                     self?.userOrganizations = organizations
+                    StatusBarDebugger.shared.log(.network, "🗑️ Clearing organizations popup")
                     self?.organizationsPopUp.removeAllItems()
                     
                     if organizations.isEmpty {
+                        StatusBarDebugger.shared.log(.network, "❌ No organizations - showing empty state")
                         self?.organizationsPopUp.addItem(withTitle: "No organizations")
                         self?.organizationsPopUp.isEnabled = false
                     } else if organizations.count == 1 {
                         // Auto-select single organization for better UX
                         let singleOrg = organizations[0]
+                        StatusBarDebugger.shared.log(.network, "🎯 Single organization - auto-selecting", context: ["org": singleOrg.login])
                         self?.organizationsPopUp.addItem(withTitle: singleOrg.login)
                         self?.organizationsPopUp.selectItem(at: 0)
                         self?.organizationsPopUp.isEnabled = true
@@ -913,11 +905,24 @@ public class RepositorySettingsWindow: NSWindowController {
                         self?.loadOrganizationRepositories(for: singleOrg.login)
                     } else {
                         // Multiple organizations - show dropdown with selection required
+                        StatusBarDebugger.shared.log(.network, "📋 Multiple organizations - building dropdown")
                         self?.organizationsPopUp.addItem(withTitle: "Select organization...")
-                        for org in organizations {
+                        StatusBarDebugger.shared.log(.network, "➕ Added 'Select organization...' item")
+                        
+                        for (index, org) in organizations.enumerated() {
                             self?.organizationsPopUp.addItem(withTitle: org.login)
+                            StatusBarDebugger.shared.log(.network, "➕ Added organization item", context: [
+                                "index": "\(index + 1)",
+                                "org": org.login
+                            ])
                         }
+                        
                         self?.organizationsPopUp.isEnabled = true
+                        StatusBarDebugger.shared.log(.network, "✅ Organizations popup setup complete", context: [
+                            "finalItemCount": "\(self?.organizationsPopUp.numberOfItems ?? 0)",
+                            "finalItems": self?.organizationsPopUp.itemTitles ?? [],
+                            "isEnabled": "\(self?.organizationsPopUp.isEnabled ?? false)"
+                        ])
                     }
                     
                 case .failure(let error):
@@ -931,20 +936,36 @@ public class RepositorySettingsWindow: NSWindowController {
     }
     
     private func loadOrganizationRepositories(for orgLogin: String) {
+        StatusBarDebugger.shared.log(.network, "🏢 Starting loadOrganizationRepositories", context: ["org": orgLogin])
         showLoading(true)
         
         gitHubClient.getOrganizationRepositories(org: orgLogin) { [weak self] result in
+            StatusBarDebugger.shared.log(.network, "📡 getOrganizationRepositories callback received", context: ["org": orgLogin])
             DispatchQueue.main.async {
+                StatusBarDebugger.shared.log(.network, "🎯 In main dispatch queue for org repos update")
                 self?.showLoading(false)
                 
                 switch result {
                 case .success(let repositories):
+                    StatusBarDebugger.shared.log(.network, "✅ Organization repositories success", context: [
+                        "org": orgLogin,
+                        "count": "\(repositories.count)",
+                        "repos": repositories.map { $0.name }
+                    ])
                     self?.selectedOrgRepositories = repositories
                     self?.orgTableView.reloadData()
+                    StatusBarDebugger.shared.log(.network, "📊 Organization table reloaded", context: [
+                        "org": orgLogin,
+                        "tableRows": "\(self?.orgTableView.numberOfRows ?? 0)"
+                    ])
                     // Preload workflow status for all repositories to avoid lag when scrolling
                     self?.preloadWorkflowStatus(for: repositories)
                     
                 case .failure(let error):
+                    StatusBarDebugger.shared.log(.error, "❌ Failed to load organization repositories", context: [
+                        "org": orgLogin,
+                        "error": error.localizedDescription
+                    ])
                     self?.showError("Failed to fetch repositories for \(orgLogin): \(error.localizedDescription)")
                 }
             }
@@ -1000,25 +1021,42 @@ public class RepositorySettingsWindow: NSWindowController {
     // Organizations Tab Actions
     @objc private func organizationChanged() {
         let selectedIndex = organizationsPopUp.indexOfSelectedItem
+        StatusBarDebugger.shared.log(.menu, "🎯 organizationChanged triggered", context: [
+            "selectedIndex": "\(selectedIndex)",
+            "totalOrgs": "\(userOrganizations.count)",
+            "popupItems": organizationsPopUp.itemTitles
+        ])
         
         // Handle different organization selection scenarios
         if userOrganizations.count == 1 {
             // Single organization case - selectedIndex 0 is the organization
+            StatusBarDebugger.shared.log(.menu, "📍 Single organization case")
             guard selectedIndex == 0 else {
+                StatusBarDebugger.shared.log(.menu, "⚠️ Invalid selection - clearing table")
                 selectedOrgRepositories = []
                 orgTableView.reloadData()
                 return
             }
             let selectedOrg = userOrganizations[0]
+            StatusBarDebugger.shared.log(.menu, "🚀 Loading repositories for single org", context: ["org": selectedOrg.login])
             loadOrganizationRepositories(for: selectedOrg.login)
         } else {
             // Multiple organizations case - selectedIndex 0 is "Select organization..."
+            StatusBarDebugger.shared.log(.menu, "📍 Multiple organizations case")
             guard selectedIndex > 0, selectedIndex <= userOrganizations.count else {
+                StatusBarDebugger.shared.log(.menu, "⚠️ Invalid selection or 'Select organization...' - clearing table", context: [
+                    "selectedIndex": "\(selectedIndex)",
+                    "validRange": "1 to \(userOrganizations.count)"
+                ])
                 selectedOrgRepositories = []
                 orgTableView.reloadData()
                 return
             }
             let selectedOrg = userOrganizations[selectedIndex - 1]
+            StatusBarDebugger.shared.log(.menu, "🚀 Loading repositories for selected org", context: [
+                "org": selectedOrg.login,
+                "selectedIndex": "\(selectedIndex)"
+            ])
             loadOrganizationRepositories(for: selectedOrg.login)
         }
     }
@@ -1752,8 +1790,39 @@ extension RepositorySettingsWindow: NSTabViewDelegate {
                 loadPersonalRepositories()
             }
         case "organizations":
+            StatusBarDebugger.shared.log(.menu, "🔄 Processing organizations tab switch", context: [
+                "isConfigured": "\(GitHubOAuthConfig.isConfigured)",
+                "userOrgsCount": "\(userOrganizations.count)",
+                "userOrgsEmpty": "\(userOrganizations.isEmpty)",
+                "popupItemCount": "\(organizationsPopUp.numberOfItems)"
+            ])
+            
             if GitHubOAuthConfig.isConfigured && userOrganizations.isEmpty {
+                StatusBarDebugger.shared.log(.menu, "🚀 Calling loadUserOrganizations (userOrganizations is empty)")
                 loadUserOrganizations()
+            } else if GitHubOAuthConfig.isConfigured {
+                StatusBarDebugger.shared.log(.menu, "🔍 userOrganizations not empty - checking popup state")
+                // If we have organizations but popup is empty, repopulate it
+                if !userOrganizations.isEmpty && organizationsPopUp.numberOfItems == 0 {
+                    StatusBarDebugger.shared.log(.menu, "🔧 Repopulating empty popup with existing data")
+                    organizationsPopUp.removeAllItems()
+                    organizationsPopUp.addItem(withTitle: "Select organization...")
+                    for org in userOrganizations {
+                        organizationsPopUp.addItem(withTitle: org.login)
+                    }
+                    organizationsPopUp.isEnabled = true
+                    StatusBarDebugger.shared.log(.menu, "✅ Popup repopulated", context: [
+                        "finalItemCount": "\(organizationsPopUp.numberOfItems)",
+                        "finalItems": organizationsPopUp.itemTitles
+                    ])
+                } else {
+                    StatusBarDebugger.shared.log(.menu, "ℹ️ No repopulation needed", context: [
+                        "userOrgsEmpty": "\(userOrganizations.isEmpty)",
+                        "popupItemCount": "\(organizationsPopUp.numberOfItems)"
+                    ])
+                }
+            } else {
+                StatusBarDebugger.shared.log(.menu, "⚠️ GitHub not configured - skipping organizations load")
             }
         case "searchtest":
             // Nothing to load automatically for search tab
@@ -1770,54 +1839,49 @@ extension RepositorySettingsWindow: NSTabViewDelegate {
     // MARK: - Testing Support Methods
     
     #if DEBUG
-    public func setTestData(monitoredRepositories: [MonitoredRepository]? = nil, searchResults: [Repository]? = nil, personalRepositories: [Repository]? = nil, organizations: [Organization]? = nil) {
-        // Enable test mode to prevent real API calls
-        isTestMode = true
+    /// Sets test data for monitored repositories (not API-related)
+    /// This is needed because monitored repos come from RepositoryManager, not API calls
+    public func setTestMonitoredRepositories(_ repositories: [MonitoredRepository]) {
+        monitoredRepositories = repositories
+        monitoredTableView.reloadData()
+    }
+    
+    /// Sets test data for search results by configuring mock API response
+    public func setTestSearchResults(_ repositories: [Repository]) {
+        searchResults = repositories
+        searchResultsTable.reloadData()
+    }
+    
+    /// Sets test data for organizations (not API-related)
+    /// This populates the organizations dropdown and enables API-like behavior
+    public func setTestOrganizations(_ organizations: [Organization]) {
+        userOrganizations = organizations
+        organizationsPopUp.removeAllItems()
         
-        // Ensure we're on the main thread for UI updates
-        DispatchQueue.main.async { [weak self] in
-            if let monitored = monitoredRepositories {
-                self?.monitoredRepositories = monitored
-                self?.monitoredTableView.reloadData()
-                StatusBarDebugger.shared.log(.state, "Test: Set monitored repositories", context: ["count": monitored.count])
-                StatusBarDebugger.shared.log(.state, "Test: monitoredTableView.numberOfRows after reload", context: ["rows": self?.monitoredTableView.numberOfRows ?? -1])
+        if organizations.isEmpty {
+            organizationsPopUp.addItem(withTitle: "No organizations")
+            organizationsPopUp.isEnabled = false
+        } else if organizations.count == 1 {
+            // Auto-select single organization for better UX
+            let singleOrg = organizations[0]
+            organizationsPopUp.addItem(withTitle: singleOrg.login)
+            organizationsPopUp.selectItem(at: 0)
+            // Automatically load org repositories for single org
+            organizationChanged()
+        } else {
+            // Multiple organizations - user needs to select
+            organizationsPopUp.addItem(withTitle: "Select organization...")
+            for org in organizations {
+                organizationsPopUp.addItem(withTitle: org.login)
             }
-            
-            if let search = searchResults {
-                self?.searchResults = search
-                self?.searchResultsTable.reloadData()
-                StatusBarDebugger.shared.log(.state, "Test: Set search results", context: ["count": search.count])
-                StatusBarDebugger.shared.log(.state, "Test: searchResultsTable.numberOfRows after reload", context: ["rows": self?.searchResultsTable.numberOfRows ?? -1])
-            }
-            
-            if let personal = personalRepositories {
-                self?.personalRepositories = personal
-                self?.personalTableView.reloadData()
-                StatusBarDebugger.shared.log(.state, "Test: Set personal repositories", context: ["count": personal.count])
-                StatusBarDebugger.shared.log(.state, "Test: personalTableView.numberOfRows after reload", context: ["rows": self?.personalTableView.numberOfRows ?? -1])
-            }
-            
-            if let orgs = organizations {
-                self?.userOrganizations = orgs
-                self?.organizationsPopUp.removeAllItems()
-                
-                if orgs.isEmpty {
-                    self?.organizationsPopUp.addItem(withTitle: "No organizations")
-                    self?.organizationsPopUp.isEnabled = false
-                } else {
-                    self?.organizationsPopUp.addItem(withTitle: "Select organization...")
-                    for org in orgs {
-                        self?.organizationsPopUp.addItem(withTitle: org.login)
-                    }
-                    self?.organizationsPopUp.isEnabled = true
-                }
-                
-                StatusBarDebugger.shared.log(.state, "Test: Set organizations", context: ["count": orgs.count])
-            }
-            
-            // Force layout update after data changes
-            self?.window?.contentView?.layoutSubtreeIfNeeded()
+            organizationsPopUp.isEnabled = true
         }
+    }
+    
+    /// Sets test data for organization repositories
+    public func setTestOrganizationRepositories(_ repositories: [Repository]) {
+        selectedOrgRepositories = repositories
+        orgTableView.reloadData()
     }
     #endif
     

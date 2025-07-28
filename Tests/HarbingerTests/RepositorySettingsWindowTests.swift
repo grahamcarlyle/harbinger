@@ -13,34 +13,44 @@ class MockGitHubClient: GitHubClientProtocol {
     
     func getRepositories(completion: @escaping (Result<[Repository], GitHubClient.GitHubError>) -> Void) {
         StatusBarDebugger.shared.log(.state, "MockGitHubClient: getRepositories called")
-        completion(.success(mockPersonalRepositories))
+        DispatchQueue.main.async {
+            completion(.success(self.mockPersonalRepositories))
+        }
     }
     
     func getUserOrganizations(completion: @escaping (Result<[Organization], GitHubClient.GitHubError>) -> Void) {
         StatusBarDebugger.shared.log(.state, "MockGitHubClient: getUserOrganizations called")
-        completion(.success(mockOrganizations))
+        DispatchQueue.main.async {
+            completion(.success(self.mockOrganizations))
+        }
     }
     
     func getOrganizationRepositories(org: String, completion: @escaping (Result<[Repository], GitHubClient.GitHubError>) -> Void) {
         StatusBarDebugger.shared.log(.state, "MockGitHubClient: getOrganizationRepositories called", context: ["org": org])
-        completion(.success(mockOrgRepositories))
+        DispatchQueue.main.async {
+            completion(.success(self.mockOrgRepositories))
+        }
     }
     
     func getWorkflows(owner: String, repo: String, completion: @escaping (Result<WorkflowsResponse, GitHubClient.GitHubError>) -> Void) {
         StatusBarDebugger.shared.log(.state, "MockGitHubClient: getWorkflows called", context: ["owner": owner, "repo": repo])
-        if let workflows = mockWorkflows {
-            completion(.success(workflows))
-        } else {
-            completion(.success(WorkflowsResponse(totalCount: 0, workflows: [])))
+        DispatchQueue.main.async {
+            if let workflows = self.mockWorkflows {
+                completion(.success(workflows))
+            } else {
+                completion(.success(WorkflowsResponse(totalCount: 0, workflows: [])))
+            }
         }
     }
     
     func searchPublicRepositories(query: String, sort: String, order: String, page: Int, perPage: Int, completion: @escaping (Result<RepositorySearchResponse, GitHubClient.GitHubError>) -> Void) {
         StatusBarDebugger.shared.log(.state, "MockGitHubClient: searchPublicRepositories called", context: ["query": query])
-        if let searchResults = mockSearchResults {
-            completion(.success(searchResults))
-        } else {
-            completion(.success(RepositorySearchResponse(totalCount: 0, incompleteResults: false, items: [])))
+        DispatchQueue.main.async {
+            if let searchResults = self.mockSearchResults {
+                completion(.success(searchResults))
+            } else {
+                completion(.success(RepositorySearchResponse(totalCount: 0, incompleteResults: false, items: [])))
+            }
         }
     }
     
@@ -57,11 +67,300 @@ final class RepositorySettingsWindowTests: XCTestCase {
     override class func setUp() {
         super.setUp()
         TestEnvironment.setupTestEnvironment()
+        
+        // Set up mock OAuth configuration so that GitHubOAuthConfig.isConfigured returns true
+        // This allows organization and personal repository tabs to load data
+        GitHubOAuthConfig.keychainService = MockKeychainService()
     }
     
     override class func tearDown() {
         TestEnvironment.tearDownTestEnvironment()
+        
+        // Restore production keychain service after all tests complete
+        GitHubOAuthConfig.keychainService = ProductionKeychainService()
+        
         super.tearDown()
+    }
+    
+    // MARK: - Test Data Setup
+    
+    private func setupRealisticMockData() {
+        // Set up realistic personal repositories (8 repos with varied characteristics)
+        let defaultPersonalRepos = [
+            Repository(
+                name: "harbinger-cli",
+                fullName: "testuser/harbinger-cli",
+                owner: RepositoryOwner(login: "testuser"),
+                private: false,
+                htmlUrl: "https://github.com/testuser/harbinger-cli",
+                description: "Command line tool for GitHub workflow monitoring",
+                language: "Swift",
+                stargazersCount: 245,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "web-dashboard",
+                fullName: "testuser/web-dashboard",
+                owner: RepositoryOwner(login: "testuser"),
+                private: true,
+                htmlUrl: "https://github.com/testuser/web-dashboard",
+                description: "React dashboard for project metrics",
+                language: "TypeScript",
+                stargazersCount: 89,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "api-gateway",
+                fullName: "testuser/api-gateway",
+                owner: RepositoryOwner(login: "testuser"),
+                private: true,
+                htmlUrl: "https://github.com/testuser/api-gateway",
+                description: "Microservices API gateway with authentication",
+                language: "Go",
+                stargazersCount: 156,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "legacy-tools",
+                fullName: "testuser/legacy-tools",
+                owner: RepositoryOwner(login: "testuser"),
+                private: false,
+                htmlUrl: "https://github.com/testuser/legacy-tools",
+                description: "Collection of legacy automation scripts",
+                language: "Python",
+                stargazersCount: 34,
+                fork: false,
+                archived: true,
+                disabled: false
+            ),
+            Repository(
+                name: "mobile-app",
+                fullName: "testuser/mobile-app",
+                owner: RepositoryOwner(login: "testuser"),
+                private: true,
+                htmlUrl: "https://github.com/testuser/mobile-app",
+                description: "iOS and Android mobile application",
+                language: "Dart",
+                stargazersCount: 67,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "docs-site",
+                fullName: "testuser/docs-site",
+                owner: RepositoryOwner(login: "testuser"),
+                private: false,
+                htmlUrl: "https://github.com/testuser/docs-site",
+                description: "Documentation website built with Jekyll",
+                language: "HTML",
+                stargazersCount: 23,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "contrib-fork",
+                fullName: "testuser/contrib-fork",
+                owner: RepositoryOwner(login: "testuser"),
+                private: false,
+                htmlUrl: "https://github.com/testuser/contrib-fork",
+                description: "Fork of open source project for contributions",
+                language: "JavaScript",
+                stargazersCount: 892,
+                fork: true,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "experimental",
+                fullName: "testuser/experimental",
+                owner: RepositoryOwner(login: "testuser"),
+                private: true,
+                htmlUrl: "https://github.com/testuser/experimental",
+                description: "Experimental features and prototypes",
+                language: "Rust",
+                stargazersCount: 12,
+                fork: false,
+                archived: false,
+                disabled: false
+            )
+        ]
+        
+        // Set up realistic organizations (3 orgs with different characteristics)
+        let defaultOrganizations = [
+            Organization(login: "acme-corp", id: 201, url: "https://github.com/acme-corp", reposUrl: "https://api.github.com/orgs/acme-corp/repos", description: "Enterprise technology company"),
+            Organization(login: "opensource-collective", id: 202, url: "https://github.com/opensource-collective", reposUrl: "https://api.github.com/orgs/opensource-collective/repos", description: "Open source software collective"),
+            Organization(login: "startup-incubator", id: 203, url: "https://github.com/startup-incubator", reposUrl: "https://api.github.com/orgs/startup-incubator/repos", description: "Startup acceleration and incubation")
+        ]
+        
+        // Set up organization repositories (6 repos across different orgs)
+        let defaultOrgRepos = [
+            Repository(
+                name: "backend-services",
+                fullName: "acme-corp/backend-services",
+                owner: RepositoryOwner(login: "acme-corp"),
+                private: true,
+                htmlUrl: "https://github.com/acme-corp/backend-services",
+                description: "Core backend microservices architecture",
+                language: "Java",
+                stargazersCount: 445,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "ui-components",
+                fullName: "acme-corp/ui-components",
+                owner: RepositoryOwner(login: "acme-corp"),
+                private: false,
+                htmlUrl: "https://github.com/acme-corp/ui-components",
+                description: "Reusable React component library",
+                language: "TypeScript",
+                stargazersCount: 678,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "data-pipeline",
+                fullName: "acme-corp/data-pipeline",
+                owner: RepositoryOwner(login: "acme-corp"),
+                private: true,
+                htmlUrl: "https://github.com/acme-corp/data-pipeline",
+                description: "ETL pipeline for analytics data processing",
+                language: "Python",
+                stargazersCount: 234,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "community-tools",
+                fullName: "opensource-collective/community-tools",
+                owner: RepositoryOwner(login: "opensource-collective"),
+                private: false,
+                htmlUrl: "https://github.com/opensource-collective/community-tools",
+                description: "Tools for managing open source communities",
+                language: "Go",
+                stargazersCount: 1234,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "learning-platform",
+                fullName: "startup-incubator/learning-platform",
+                owner: RepositoryOwner(login: "startup-incubator"),
+                private: true,
+                htmlUrl: "https://github.com/startup-incubator/learning-platform",
+                description: "Educational platform for startup founders",
+                language: "Ruby",
+                stargazersCount: 89,
+                fork: false,
+                archived: false,
+                disabled: false
+            ),
+            Repository(
+                name: "demo-projects",
+                fullName: "startup-incubator/demo-projects",
+                owner: RepositoryOwner(login: "startup-incubator"),
+                private: false,
+                htmlUrl: "https://github.com/startup-incubator/demo-projects",
+                description: "Collection of demo projects for workshops",
+                language: "Various",
+                stargazersCount: 156,
+                fork: false,
+                archived: false,
+                disabled: false
+            )
+        ]
+        
+        // Set up realistic search results (subset of public repos for search testing)
+        let defaultSearchResults = RepositorySearchResponse(
+            totalCount: 1000000,
+            incompleteResults: false,
+            items: [
+                defaultPersonalRepos[0], // harbinger-cli
+                defaultPersonalRepos[5], // docs-site
+                defaultPersonalRepos[6], // contrib-fork
+                defaultOrgRepos[1], // ui-components
+                defaultOrgRepos[3], // community-tools
+                defaultOrgRepos[5]  // demo-projects
+            ]
+        )
+        
+        // Set up realistic workflows response (for workflow detection tests)
+        let defaultWorkflows = WorkflowsResponse(
+            totalCount: 4,
+            workflows: [
+                Workflow(
+                    id: 401,
+                    name: "CI/CD Pipeline",
+                    path: ".github/workflows/ci.yml",
+                    state: "active",
+                    createdAt: "2024-01-15T10:30:00Z",
+                    updatedAt: "2024-12-01T14:22:00Z",
+                    url: "https://api.github.com/repos/testuser/harbinger-cli/actions/workflows/ci.yml",
+                    htmlUrl: "https://github.com/testuser/harbinger-cli/actions/workflows/ci.yml",
+                    badgeUrl: "https://github.com/testuser/harbinger-cli/workflows/CI%2FCD%20Pipeline/badge.svg"
+                ),
+                Workflow(
+                    id: 402,
+                    name: "Release",
+                    path: ".github/workflows/release.yml",
+                    state: "active",
+                    createdAt: "2024-01-15T10:31:00Z",
+                    updatedAt: "2024-11-28T16:45:00Z",
+                    url: "https://api.github.com/repos/testuser/harbinger-cli/actions/workflows/release.yml",
+                    htmlUrl: "https://github.com/testuser/harbinger-cli/actions/workflows/release.yml",
+                    badgeUrl: "https://github.com/testuser/harbinger-cli/workflows/Release/badge.svg"
+                ),
+                Workflow(
+                    id: 403,
+                    name: "Security Scan",
+                    path: ".github/workflows/security.yml",
+                    state: "active",
+                    createdAt: "2024-02-10T09:15:00Z",
+                    updatedAt: "2024-12-10T11:30:00Z",
+                    url: "https://api.github.com/repos/testuser/harbinger-cli/actions/workflows/security.yml",
+                    htmlUrl: "https://github.com/testuser/harbinger-cli/actions/workflows/security.yml",
+                    badgeUrl: "https://github.com/testuser/harbinger-cli/workflows/Security%20Scan/badge.svg"
+                ),
+                Workflow(
+                    id: 404,
+                    name: "Deprecated Build",
+                    path: ".github/workflows/old-build.yml",
+                    state: "disabled",
+                    createdAt: "2023-08-20T14:00:00Z",
+                    updatedAt: "2024-06-15T12:00:00Z",
+                    url: "https://api.github.com/repos/testuser/harbinger-cli/actions/workflows/old-build.yml",
+                    htmlUrl: "https://github.com/testuser/harbinger-cli/actions/workflows/old-build.yml",
+                    badgeUrl: "https://github.com/testuser/harbinger-cli/workflows/Deprecated%20Build/badge.svg"
+                )
+            ]
+        )
+        
+        // Apply default mock data to client
+        mockGitHubClient.mockPersonalRepositories = defaultPersonalRepos
+        mockGitHubClient.mockOrganizations = defaultOrganizations
+        mockGitHubClient.mockOrgRepositories = defaultOrgRepos
+        mockGitHubClient.mockSearchResults = defaultSearchResults
+        mockGitHubClient.mockWorkflows = defaultWorkflows
+        
+        StatusBarDebugger.shared.log(.state, "Set up realistic mock data", context: [
+            "personalRepos": "\(defaultPersonalRepos.count)",
+            "organizations": "\(defaultOrganizations.count)",
+            "orgRepos": "\(defaultOrgRepos.count)",
+            "searchResults": "\(defaultSearchResults.items.count)",
+            "workflows": "\(defaultWorkflows.workflows.count)"
+        ])
     }
     
     override func setUp() {
@@ -70,8 +369,12 @@ final class RepositorySettingsWindowTests: XCTestCase {
         // Set up test-specific logging
         StatusBarDebugger.shared.setCurrentTest(self.name)
         
-        // Create mock GitHub client
+        // Set up mock access token so GitHubOAuthConfig.isConfigured returns true
+        GitHubOAuthConfig.setAccessToken("mock_test_token_123")
+        
+        // Create mock GitHub client with realistic default data
         mockGitHubClient = MockGitHubClient()
+        setupRealisticMockData()
         
         // Inject mock client into settings window
         settingsWindow = RepositorySettingsWindow(gitHubClient: mockGitHubClient)
@@ -84,11 +387,18 @@ final class RepositorySettingsWindowTests: XCTestCase {
         
         // Force initial layout pass (works in both modes)
         settingsWindow.window?.contentView?.layoutSubtreeIfNeeded()
+        
+        // Wait for async data loading operations to complete (organizations, personal repos)
+        // This ensures that loadUserOrganizations() and loadPersonalRepositories() complete
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
     }
     
     override func tearDown() {
         settingsWindow.close()
         settingsWindow = nil
+        
+        // Clear mock access token for test isolation
+        GitHubOAuthConfig.clearCredentials()
         
         // Clear test-specific logging
         StatusBarDebugger.shared.clearCurrentTest()
@@ -146,11 +456,107 @@ final class RepositorySettingsWindowTests: XCTestCase {
     }
     
     func testOrganizationsTabLayoutDimensions() {
-        StatusBarDebugger.shared.log(.lifecycle, "ORGANIZATIONS TAB LAYOUT ANALYSIS")
-        switchToTab(identifier: "organizations")
-        let measurements = measureTabLayout(tabName: "Organizations")
+        StatusBarDebugger.shared.log(.lifecycle, "=== ORGANIZATIONS TAB DETAILED ANALYSIS START ===")
         
+        // Step 1: Log initial state before switching
+        let currentTabId: String
+        if let contentView = settingsWindow.window?.contentView,
+           let tabView = findTabView(in: contentView),
+           let selectedItem = tabView.selectedTabViewItem,
+           let identifier = selectedItem.identifier as? String {
+            currentTabId = identifier
+        } else {
+            currentTabId = "none"
+        }
+        
+        StatusBarDebugger.shared.log(.verification, "Initial state check", context: [
+            "currentTab": currentTabId,
+            "mockOrgCount": "\(mockGitHubClient.mockOrganizations.count)",
+            "mockOrgs": mockGitHubClient.mockOrganizations.map { $0.login }
+        ])
+        
+        // Step 2: Switch to organizations tab with detailed logging
+        StatusBarDebugger.shared.log(.verification, "About to switch to organizations tab")
+        switchToTab(identifier: "organizations")
+        StatusBarDebugger.shared.log(.verification, "Completed switch to organizations tab")
+        
+        // Step 3: Immediate check after switch
+        if let organizationsPopUp = findOrganizationsPopUp() {
+            StatusBarDebugger.shared.log(.verification, "Organizations popup found immediately after switch", context: [
+                "itemCount": "\(organizationsPopUp.numberOfItems)",
+                "items": organizationsPopUp.itemTitles,
+                "isEnabled": "\(organizationsPopUp.isEnabled)"
+            ])
+        } else {
+            StatusBarDebugger.shared.log(.error, "Could not find organizations popup after switch")
+        }
+        
+        // Step 4: Wait additional time and check again
+        StatusBarDebugger.shared.log(.verification, "Waiting additional time for any delayed UI updates")
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
+        
+        // Step 5: Final verification
+        if let organizationsPopUp = findOrganizationsPopUp() {
+            StatusBarDebugger.shared.log(.verification, "Final organizations popup state", context: [
+                "itemCount": "\(organizationsPopUp.numberOfItems)",
+                "items": organizationsPopUp.itemTitles,
+                "isEnabled": "\(organizationsPopUp.isEnabled)",
+                "selectedIndex": "\(organizationsPopUp.indexOfSelectedItem)"
+            ])
+            
+            // Step 6: Verify expected content
+            let expectedItems = ["Select organization...", "acme-corp", "opensource-collective", "startup-incubator"]
+            let actualItems = organizationsPopUp.itemTitles
+            
+            if actualItems == expectedItems {
+                StatusBarDebugger.shared.log(.verification, "✅ Organizations popup has correct content!")
+                
+                // Step 7: Select the first organization to populate the table
+                if organizationsPopUp.numberOfItems > 1 {
+                    StatusBarDebugger.shared.log(.verification, "📋 Selecting first organization to populate table")
+                    organizationsPopUp.selectItem(at: 1) // Index 1 = "acme-corp" (skip "Select organization...")
+                    
+                    // Manually trigger the action to simulate user selection
+                    if let target = organizationsPopUp.target,
+                       let action = organizationsPopUp.action {
+                        _ = target.perform(action, with: organizationsPopUp)
+                        StatusBarDebugger.shared.log(.verification, "🎯 Triggered organization selection action")
+                    }
+                    
+                    // Wait for organization repositories to load
+                    StatusBarDebugger.shared.log(.verification, "⏳ Waiting for organization repositories to load")
+                    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
+                    
+                    // Step 8: Check if organization table is now populated
+                    if let orgTableView = findOrgTableView() {
+                        StatusBarDebugger.shared.log(.verification, "📊 Organization table state", context: [
+                            "rowCount": "\(orgTableView.numberOfRows)",
+                            "columnCount": "\(orgTableView.numberOfColumns)"
+                        ])
+                        
+                        if orgTableView.numberOfRows > 0 {
+                            StatusBarDebugger.shared.log(.verification, "✅ Organization table populated with repositories!")
+                        } else {
+                            StatusBarDebugger.shared.log(.error, "❌ Organization table is still empty after selection")
+                        }
+                    } else {
+                        StatusBarDebugger.shared.log(.error, "❌ Could not find organization table view")
+                    }
+                }
+            } else {
+                StatusBarDebugger.shared.log(.error, "❌ Organizations popup content mismatch", context: [
+                    "expected": expectedItems,
+                    "actual": actualItems
+                ])
+            }
+        } else {
+            StatusBarDebugger.shared.log(.error, "❌ Could not find organizations popup in final check")
+        }
+        
+        let measurements = measureTabLayout(tabName: "Organizations")
         logDetailedMeasurements(measurements, tabName: "Organizations")
+        
+        StatusBarDebugger.shared.log(.lifecycle, "=== ORGANIZATIONS TAB DETAILED ANALYSIS END ===")
     }
     
     func testPublicSearchTabLayoutDimensions() {
@@ -440,10 +846,10 @@ final class RepositorySettingsWindowTests: XCTestCase {
         }
         
         // Simulate populating the monitored repositories table
-        settingsWindow.setTestData(monitoredRepositories: Array(mockMonitoredRepos))
+        settingsWindow.setTestMonitoredRepositories(Array(mockMonitoredRepos))
         
         // Simulate populating search results
-        settingsWindow.setTestData(searchResults: mockRepos.suffix(10).map { $0.toRepository() })
+        settingsWindow.setTestSearchResults(mockRepos.suffix(10).map { $0.toRepository() })
         
         StatusBarDebugger.shared.log(.verification, "Populated tables with realistic data", context: ["monitoredCount": "\(mockMonitoredRepos.count)", "searchResultsCount": "\(mockRepos.suffix(10).count)"])
         
@@ -543,8 +949,8 @@ final class RepositorySettingsWindowTests: XCTestCase {
             )
         ]
         
-        // Set test data for search results (this test focuses on UI population, not API calls)
-        settingsWindow.setTestData(searchResults: testSearchResults)
+        // Set test data for search results (direct UI test, not API-related)
+        settingsWindow.setTestSearchResults(testSearchResults)
         
         // Allow UI to update
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
@@ -659,41 +1065,9 @@ final class RepositorySettingsWindowTests: XCTestCase {
 
     func testPersonalRepositoriesApiCall() {
         // This test verifies that the Personal tab displays personal repositories correctly using mock data
+        // Note: Uses the default realistic mock data set up in setupRealisticMockData() (8 repositories)
         
-        // Create mock personal repositories data  
-        let mockPersonalRepos = [
-            Repository(
-                name: "project-alpha",
-                fullName: "testuser/project-alpha",
-                owner: RepositoryOwner(login: "testuser"),
-                private: false,
-                htmlUrl: "https://github.com/testuser/project-alpha",
-                description: "Personal project for alpha testing",
-                language: "Swift",
-                stargazersCount: 15,
-                fork: false,
-                archived: false,
-                disabled: false
-            ),
-            Repository(
-                name: "beta-tool",
-                fullName: "testuser/beta-tool",
-                owner: RepositoryOwner(login: "testuser"),
-                private: true,
-                htmlUrl: "https://github.com/testuser/beta-tool",
-                description: "Private development tool",
-                language: "Python",
-                stargazersCount: 8,
-                fork: false,
-                archived: false,
-                disabled: false
-            )
-        ]
-        
-        // Set test data directly in the settings window - this ensures no real API calls
-        settingsWindow.setTestData(personalRepositories: mockPersonalRepos)
-        
-        // Switch to personal tab
+        // Switch to personal tab (this triggers loadPersonalRepositories via real production flow)
         switchToTab(identifier: "personal")
         
         // Allow UI to update
@@ -716,12 +1090,12 @@ final class RepositorySettingsWindowTests: XCTestCase {
         StatusBarDebugger.shared.log(.verification, "Personal tab is correctly configured with table view")
         
         // Verify that the mock data is displayed
-        XCTAssertEqual(personalTableView!.numberOfRows, 2, "Should display 2 mock personal repositories")
+        XCTAssertEqual(personalTableView!.numberOfRows, 8, "Should display 8 mock personal repositories")
         
-        // Check that the first repository data is correct
+        // Check that the first repository data is correct (harbinger-cli from default mock data)
         if let nameCell = personalTableView!.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTableCellView,
            let nameTextField = nameCell.textField {
-            XCTAssertEqual(nameTextField.stringValue, "testuser/project-alpha", "First row should show first mock repository")
+            XCTAssertEqual(nameTextField.stringValue, "testuser/harbinger-cli", "First row should show first mock repository")
         }
         
         StatusBarDebugger.shared.log(.verification, "Personal repositories mock data test completed successfully")
@@ -821,7 +1195,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         
         // Set test data in search tab
         switchToTab(identifier: "searchtest")
-        settingsWindow.setTestData(searchResults: [pendingRepo, repoWithWorkflows, repoWithoutWorkflows, archivedRepo])
+        settingsWindow.setTestSearchResults([pendingRepo, repoWithWorkflows, repoWithoutWorkflows, archivedRepo])
         
         // Allow UI to update
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
@@ -922,7 +1296,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         
         // Set test data in search tab
         switchToTab(identifier: "searchtest")
-        settingsWindow.setTestData(searchResults: [repoWithWorkflows, repoWithoutWorkflows, archivedRepo])
+        settingsWindow.setTestSearchResults([repoWithWorkflows, repoWithoutWorkflows, archivedRepo])
         
         // Allow UI to update
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
@@ -1014,7 +1388,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         
         // Set test data with mixed viability
         switchToTab(identifier: "searchtest")
-        settingsWindow.setTestData(searchResults: [viableRepo, archivedRepo, disabledRepo])
+        settingsWindow.setTestSearchResults([viableRepo, archivedRepo, disabledRepo])
         
         // Allow UI to update
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
@@ -1250,6 +1624,44 @@ final class RepositorySettingsWindowTests: XCTestCase {
         return nil
     }
     
+    private func findOrganizationsPopUp() -> NSPopUpButton? {
+        guard let contentView = settingsWindow.window?.contentView else { return nil }
+        return findPopUpButton(in: contentView)
+    }
+    
+    private func findPopUpButton(in view: NSView) -> NSPopUpButton? {
+        if let popUpButton = view as? NSPopUpButton {
+            return popUpButton
+        }
+        
+        for subview in view.subviews {
+            if let found = findPopUpButton(in: subview) {
+                return found
+            }
+        }
+        
+        return nil
+    }
+    
+    private func findOrgTableView() -> NSTableView? {
+        guard let contentView = settingsWindow.window?.contentView else { return nil }
+        return findTableView(in: contentView)
+    }
+    
+    private func findTableView(in view: NSView) -> NSTableView? {
+        if let tableView = view as? NSTableView {
+            return tableView
+        }
+        
+        for subview in view.subviews {
+            if let found = findTableView(in: subview) {
+                return found
+            }
+        }
+        
+        return nil
+    }
+    
     private func switchToTab(identifier: String) {
         guard let contentView = settingsWindow.window?.contentView,
               let tabView = findTabView(in: contentView) else {
@@ -1269,8 +1681,12 @@ final class RepositorySettingsWindowTests: XCTestCase {
         // Force layout after tab switch
         contentView.layoutSubtreeIfNeeded()
         
-        // Small delay to ensure layout is complete
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+        // Wait for async operations to complete - now that MockGitHubClient is async,
+        // we need more time for DispatchQueue.main.async operations to execute
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.3))
+        
+        // Additional layout pass to ensure UI updates are fully applied
+        contentView.layoutSubtreeIfNeeded()
     }
     
     private func switchAndMeasure(identifier: String, name: String) -> TabLayoutMeasurements {
@@ -1398,7 +1814,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         )
         
         // Add the repository to monitored list for testing
-        settingsWindow.setTestData(monitoredRepositories: [testRepository])
+        settingsWindow.setTestMonitoredRepositories([testRepository])
         
         // Switch to monitored tab
         switchToTab(identifier: "monitored")
@@ -1430,10 +1846,10 @@ final class RepositorySettingsWindowTests: XCTestCase {
             "testDataRepositories": "1"
         ])
         
-        // Note: The setTestData method shows it's working (1 item, 1 row after reload)
+        // Note: The setTestMonitoredRepositories method shows it's working (1 item, 1 row after reload)
         // But there seems to be a timing issue with the table view state in tests
         // Since the core logic is what we want to test, we'll focus on that
-        StatusBarDebugger.shared.log(.verification, "Test data successfully loaded (verified by setTestData debug output)")
+        StatusBarDebugger.shared.log(.verification, "Test data successfully loaded (verified by setTestMonitoredRepositories debug output)")
         
         // Test the repository's workflow tracking methods
         XCTAssertTrue(testRepository.isWorkflowTracked("Build"), "Build workflow should be tracked")
@@ -1526,7 +1942,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         )
         
         // Set test data
-        settingsWindow.setTestData(monitoredRepositories: [testRepository])
+        settingsWindow.setTestMonitoredRepositories([testRepository])
         
         // Switch to monitored tab
         switchToTab(identifier: "monitored")
@@ -1737,7 +2153,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         )
         
         // Set up the repository in monitored list
-        settingsWindow.setTestData(monitoredRepositories: [testRepository])
+        settingsWindow.setTestMonitoredRepositories([testRepository])
         
         switchToTab(identifier: "monitored")
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
@@ -1902,7 +2318,7 @@ final class RepositorySettingsWindowTests: XCTestCase {
         )
         
         // Set up test state
-        settingsWindow.setTestData(monitoredRepositories: [testRepository])
+        settingsWindow.setTestMonitoredRepositories([testRepository])
         
         switchToTab(identifier: "monitored")
         
