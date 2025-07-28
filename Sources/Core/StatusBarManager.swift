@@ -682,13 +682,13 @@ public class StatusBarManager: NSObject {
         case .failing:
             return createSimpleStatusIcon(symbolName: "xmark.circle", tintColor: .systemRed, status: status)
         case .running:
-            return createSimpleStatusIcon(symbolName: "hourglass", tintColor: .systemYellow, status: status)
+            return createSimpleStatusIcon(symbolName: "clock.fill", tintColor: .systemOrange, status: status)
         case .runningAfterSuccess:
-            return createCombinedStatusIcon(runningIcon: "hourglass", backgroundIcon: "checkmark.circle", 
-                                          tintColor: .systemYellow, status: status)
+            return createCombinedStatusIcon(runningIcon: "clock.fill", backgroundIcon: "checkmark.circle", 
+                                          tintColor: .systemOrange, status: status)
         case .runningAfterFailure:
-            return createCombinedStatusIcon(runningIcon: "hourglass", backgroundIcon: "xmark.circle", 
-                                          tintColor: .systemOrange, status: status) // Orange indicates running after failure
+            return createCombinedStatusIcon(runningIcon: "clock.fill", backgroundIcon: "xmark.circle", 
+                                          tintColor: .systemRed, status: status) // Red indicates running after failure
         }
     }
     
