@@ -23,7 +23,7 @@ swift build
 # Run the app
 swift run
 
-# Run unit tests including integration tests (84 tests)
+# Run unit tests including integration tests
 swift test
 
 # Create app bundle (debug build)
@@ -128,13 +128,14 @@ open ~/Documents/HarbingerLogs
 ## Development Notes
 
 ### Testing Infrastructure
-- **84 Comprehensive Tests**: Complete test suite covering all major components
+- **Comprehensive Test Suite**: Complete test coverage for all major components
 - **XCTest Framework**: Full integration with Swift Package Manager testing
 - **CI Compatible**: Tests run reliably in GitHub Actions with headless environment support
+- **CI-Friendly API Tests**: Public GitHub API tests automatically skip in CI environments to prevent rate limiting failures
 - **Dependency Injection**: MockKeychainService prevents keychain prompts during testing
 - **OAuth Validation Tests**: Tests validate scopes against GitHub's official list
 - **Client Retention Tests**: Prevents callback deallocation bugs by ensuring network clients are properly retained
-- **Public API Testing**: Tests work against real GitHub repositories without authentication
+- **Smart API Testing**: Tests gracefully handle GitHub API rate limiting and authentication restrictions
 - **Mock Testing**: JSON decoding tests with sample GitHub API responses
 - **Performance Testing**: API response time measurements included
 - **Pagination Testing**: Validates multi-page repository fetching and deduplication
@@ -142,7 +143,13 @@ open ~/Documents/HarbingerLogs
 - **Structured Logging**: Clean test output with detailed logs written to files
 
 ### User Experience
-- **Color-coded status**: Green (passing), Red (failing), Yellow (running), White (unknown)
+- **Enhanced Status Icons**: 
+  - Green checkmark (passing workflows)
+  - Red X (failing workflows) 
+  - Blue rotating arrows (running workflows)
+  - Combined states showing running workflows with last completed status context
+- **Smart Status Display**: Running workflows show both current state and last completed status for better context
+- **High Visibility Icons**: Pre-tinted status icons ensure maximum visibility in both light and dark menu bars
 - **Native macOS design patterns** with dark mode support
 - **Clickable workflow items** link directly to GitHub web interface
 - **Repository management**: Browse and select from all personal and organization repositories
@@ -166,7 +173,7 @@ Users launch Harbinger and click "Connect to GitHub" to start the user-controlle
 - Support for both authenticated and unauthenticated requests
 - Complete data models for workflows, repositories, and workflow runs
 - Robust JSON decoding with automatic snake_case conversion
-- Comprehensive unit test suite with 84 tests covering all major components
+- Comprehensive unit test suite covering all major components
 - Library + executable architecture for better testability
 
 **Phase 3 Complete** ✅
@@ -185,14 +192,15 @@ Users launch Harbinger and click "Connect to GitHub" to start the user-controlle
 - Test infrastructure improvements with CI compatibility
 - Dependency injection for keychain services
 - All print statements converted to structured logging
-- 84 comprehensive tests with clean console output
+- Comprehensive tests with clean console output
 
 **Current Features:**
 - ✅ **Complete Repository Coverage**: Fetches all repositories from personal account and organizations (handles 400+ repos with pagination)
 - ✅ **Organization Support**: Full support for organization repositories with proper permissions
 - ✅ **Real-time Monitoring**: Active monitoring of selected repositories with workflow status updates
 - ✅ **Network Client Reliability**: Fixed callback deallocation issues ensuring consistent API responses
-- ✅ **Comprehensive Testing**: 84 tests with OAuth scope validation, pagination testing, and client retention verification
+- ✅ **Enhanced Status Icons**: Implemented combined status states showing both running and last completed status for better context
+- ✅ **Comprehensive Testing**: Full test suite with OAuth scope validation, pagination testing, and client retention verification
 - ✅ **CI/CD Pipeline**: GitHub Actions workflow for automated building, testing, and distribution
 - ✅ **Structured Logging**: StatusBarDebugger system with file output and clean console for tests
 - ✅ **Test Infrastructure**: CI-compatible testing with dependency injection and environment detection
@@ -202,7 +210,7 @@ Users launch Harbinger and click "Connect to GitHub" to start the user-controlle
 ### GitHub Actions Workflow
 - **Automated Building**: Triggers on tags (v*) or manual dispatch
 - **Universal Binary**: Builds for both Intel and Apple Silicon Macs
-- **Test Execution**: Runs all 84 tests with structured logging
+- **Test Execution**: Runs comprehensive test suite with structured logging
 - **App Bundle Creation**: Creates proper macOS app bundle with dynamic versioning
 - **Artifact Storage**: Retains build logs and app bundles for 90 days
 - **Release Automation**: Creates GitHub releases with installation instructions
