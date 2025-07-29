@@ -661,9 +661,15 @@ public class StatusBarManager: NSObject {
         
         // Create colored circle icons
         let image = createStatusIcon(for: status)
+        
+        // Force the button to update by setting image to nil first, then the new image
+        button.image = nil
         button.image = image
         
-        debugger.log(.state, "Status icon image updated", context: [
+        // Force the status item to refresh
+        statusItem?.button?.needsDisplay = true
+        
+        debugger.log(.state, "Status icon image updated with forced refresh", context: [
             "status": "\(status)",
             "imageSize": "\(image.size)",
             "isTemplate": "\(image.isTemplate)"
@@ -671,6 +677,18 @@ public class StatusBarManager: NSObject {
         
         // Update tooltip
         button.toolTip = getTooltipText(for: status)
+        
+        // Additional validation - log if the update might have failed
+        DispatchQueue.main.async { [weak self] in
+            if let currentImage = button.image {
+                self?.debugger.log(.state, "Status icon update verified", context: [
+                    "finalImageSize": "\(currentImage.size)",
+                    "status": "\(status)"
+                ])
+            } else {
+                self?.debugger.log(.error, "Status icon update failed - image is nil after update", context: ["status": "\(status)"])
+            }
+        }
     }
     
     public func createStatusIcon(for status: WorkflowStatus) -> NSImage {
@@ -682,13 +700,13 @@ public class StatusBarManager: NSObject {
         case .failing:
             return createSimpleStatusIcon(symbolName: "xmark.circle", tintColor: .systemRed, status: status)
         case .running:
-            return createSimpleStatusIcon(symbolName: "clock.fill", tintColor: .systemOrange, status: status)
+            return createSimpleStatusIcon(symbolName: "circle.fill", tintColor: .systemBlue, status: status)
         case .runningAfterSuccess:
-            return createCombinedStatusIcon(runningIcon: "clock.fill", backgroundIcon: "checkmark.circle", 
-                                          tintColor: .systemOrange, status: status)
+            return createCombinedStatusIcon(runningIcon: "circle.fill", backgroundIcon: "checkmark.circle", 
+                                          tintColor: .systemBlue, status: status)
         case .runningAfterFailure:
-            return createCombinedStatusIcon(runningIcon: "clock.fill", backgroundIcon: "xmark.circle", 
-                                          tintColor: .systemRed, status: status) // Red indicates running after failure
+            return createCombinedStatusIcon(runningIcon: "circle.fill", backgroundIcon: "xmark.circle", 
+                                          tintColor: .systemPurple, status: status) // Purple to distinguish from failure red
         }
     }
     
@@ -706,30 +724,40 @@ public class StatusBarManager: NSObject {
             return baseImage
         }
         
-        // Create pre-tinted image to ensure visibility
+        // Use direct drawing approach for maximum reliability and visibility
+        return createDirectDrawnIcon(color: tintColor, status: status)
+    }
+    
+    private func createDirectDrawnIcon(color: NSColor, status: WorkflowStatus) -> NSImage {
         let size = NSSize(width: 18, height: 18)
-        let tintedImage = NSImage(size: size)
+        let image = NSImage(size: size)
         
-        tintedImage.lockFocus()
+        image.lockFocus()
         
         // Clear background
         NSColor.clear.setFill()
         NSRect(origin: .zero, size: size).fill()
         
-        // Draw the base image
-        let imageRect = NSRect(x: 0, y: 0, width: size.width, height: size.height)
-        baseImage.draw(in: imageRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        // Draw a solid filled circle with the specified color for maximum visibility
+        let circleRect = NSRect(x: 2, y: 2, width: 14, height: 14) // Slightly inset for clean appearance
+        let circlePath = NSBezierPath(ovalIn: circleRect)
         
-        // Apply tint color overlay
-        tintColor.setFill()
-        imageRect.fill(using: .sourceAtop)
+        // Fill the circle with the color
+        color.setFill()
+        circlePath.fill()
         
-        tintedImage.unlockFocus()
+        // Add a subtle border for definition
+        let borderColor = color.blended(withFraction: 0.3, of: .black) ?? color
+        borderColor.setStroke()
+        circlePath.lineWidth = 0.5
+        circlePath.stroke()
         
-        // Keep as template for dark mode support but with pre-applied color
-        tintedImage.isTemplate = false
+        image.unlockFocus()
         
-        return tintedImage
+        // Don't use template mode - we want full control over the appearance
+        image.isTemplate = false
+        
+        return image
     }
     
     private func createCombinedStatusIcon(runningIcon: String, backgroundIcon: String, tintColor: NSColor, status: WorkflowStatus) -> NSImage {

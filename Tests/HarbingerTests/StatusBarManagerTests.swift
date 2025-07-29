@@ -85,10 +85,10 @@ final class StatusBarManagerTests: XCTestCase {
         let testCases: [(StatusBarManager.WorkflowStatus, NSColor, String)] = [
             (.passing, .systemGreen, "Green"),
             (.failing, .systemRed, "Red"),
-            (.running, .systemOrange, "Orange"),
+            (.running, .systemBlue, "Blue"),
             (.unknown, .systemGray, "Gray"),
-            (.runningAfterSuccess, .systemOrange, "Orange"),
-            (.runningAfterFailure, .systemRed, "Red")
+            (.runningAfterSuccess, .systemBlue, "Blue"),
+            (.runningAfterFailure, .systemPurple, "Purple")
         ]
         
         for (status, expectedColor, colorName) in testCases {
@@ -102,11 +102,11 @@ final class StatusBarManagerTests: XCTestCase {
             case .failing:
                 color = NSColor.systemRed
             case .running:
-                color = NSColor.systemOrange
+                color = NSColor.systemBlue
             case .runningAfterSuccess:
-                color = NSColor.systemOrange
+                color = NSColor.systemBlue
             case .runningAfterFailure:
-                color = NSColor.systemRed
+                color = NSColor.systemPurple
             }
             
             XCTAssertEqual(color, expectedColor, "Status \(status) should map to \(colorName) color")
