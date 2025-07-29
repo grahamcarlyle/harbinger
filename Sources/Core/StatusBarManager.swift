@@ -698,15 +698,17 @@ public class StatusBarManager: NSObject {
         case .passing:
             return createSimpleStatusIcon(symbolName: "checkmark.circle", tintColor: nil, status: status)
         case .failing:
-            return createSimpleStatusIcon(symbolName: "xmark.circle", tintColor: .systemRed, status: status)
+            // Create a proper cross icon
+            return createCrossIcon(status: status)
         case .running:
-            return createSimpleStatusIcon(symbolName: "circle.fill", tintColor: .systemBlue, status: status)
+            // Use a play button for first run state
+            return createPlayIcon(status: status)
         case .runningAfterSuccess:
-            return createCombinedStatusIcon(runningIcon: "circle.fill", backgroundIcon: "checkmark.circle", 
-                                          tintColor: .systemBlue, status: status)
+            // Running version of success - checkmark with subtle animation indicator
+            return createAnimatedStatusIcon(baseIcon: "checkmark.circle", tintColor: .systemGreen, status: status)
         case .runningAfterFailure:
-            return createCombinedStatusIcon(runningIcon: "circle.fill", backgroundIcon: "xmark.circle", 
-                                          tintColor: .systemPurple, status: status) // Purple to distinguish from failure red
+            // Running version of failure - cross with pulsing indicator
+            return createAnimatedCrossIcon(status: status)
         }
     }
     
@@ -760,6 +762,224 @@ public class StatusBarManager: NSObject {
         return image
     }
     
+    private func createCrossIcon(status: WorkflowStatus) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        
+        image.lockFocus()
+        
+        // Clear background
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        
+        // Draw circle background
+        let circleRect = NSRect(x: 2, y: 2, width: 14, height: 14)
+        let circlePath = NSBezierPath(ovalIn: circleRect)
+        
+        // Use a light red background for the circle
+        NSColor.systemRed.withAlphaComponent(0.2).setFill()
+        circlePath.fill()
+        
+        // Add circle border
+        NSColor.systemRed.setStroke()
+        circlePath.lineWidth = 1.0
+        circlePath.stroke()
+        
+        // Draw the cross (X) inside
+        let crossColor = NSColor.systemRed
+        crossColor.setStroke()
+        
+        let crossPath = NSBezierPath()
+        crossPath.lineWidth = 2.0
+        crossPath.lineCapStyle = .round
+        
+        // Draw diagonal lines to form an X
+        let inset: CGFloat = 5
+        crossPath.move(to: NSPoint(x: 2 + inset, y: 2 + inset))
+        crossPath.line(to: NSPoint(x: 16 - inset, y: 16 - inset))
+        crossPath.move(to: NSPoint(x: 16 - inset, y: 2 + inset))
+        crossPath.line(to: NSPoint(x: 2 + inset, y: 16 - inset))
+        
+        crossPath.stroke()
+        
+        image.unlockFocus()
+        image.isTemplate = false
+        
+        return image
+    }
+    
+    private func createPlayIcon(status: WorkflowStatus) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        
+        image.lockFocus()
+        
+        // Clear background
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        
+        // Draw circle background
+        let circleRect = NSRect(x: 2, y: 2, width: 14, height: 14)
+        let circlePath = NSBezierPath(ovalIn: circleRect)
+        
+        // Use a light blue background for the circle
+        NSColor.systemBlue.withAlphaComponent(0.2).setFill()
+        circlePath.fill()
+        
+        // Add circle border
+        NSColor.systemBlue.setStroke()
+        circlePath.lineWidth = 1.0
+        circlePath.stroke()
+        
+        // Draw the play triangle (▶️) inside  
+        let trianglePath = NSBezierPath()
+        NSColor.systemBlue.setFill()
+        
+        // Create a right-pointing triangle centered in the circle
+        let centerX: CGFloat = 9  // Center of 18px icon
+        let centerY: CGFloat = 9
+        let triangleSize: CGFloat = 6
+        
+        // Triangle points (pointing right)
+        let leftPoint = NSPoint(x: centerX - triangleSize/2, y: centerY - triangleSize/2)
+        let rightPoint = NSPoint(x: centerX + triangleSize/2, y: centerY)
+        let bottomPoint = NSPoint(x: centerX - triangleSize/2, y: centerY + triangleSize/2)
+        
+        trianglePath.move(to: leftPoint)
+        trianglePath.line(to: rightPoint)
+        trianglePath.line(to: bottomPoint)
+        trianglePath.close()
+        
+        trianglePath.fill()
+        
+        image.unlockFocus()
+        image.isTemplate = false
+        
+        return image
+    }
+    
+    private func createAnimatedCrossIcon(status: WorkflowStatus) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        
+        image.lockFocus()
+        
+        // Clear background
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        
+        // Draw circle background
+        let circleRect = NSRect(x: 2, y: 2, width: 14, height: 14)
+        let circlePath = NSBezierPath(ovalIn: circleRect)
+        
+        // Use a light red background for the circle
+        NSColor.systemRed.withAlphaComponent(0.2).setFill()
+        circlePath.fill()
+        
+        // Add circle border
+        NSColor.systemRed.setStroke()
+        circlePath.lineWidth = 1.0
+        circlePath.stroke()
+        
+        // Draw the cross (X) inside
+        let crossColor = NSColor.systemRed
+        crossColor.setStroke()
+        
+        let crossPath = NSBezierPath()
+        crossPath.lineWidth = 2.0
+        crossPath.lineCapStyle = .round
+        
+        // Draw diagonal lines to form an X
+        let inset: CGFloat = 5
+        crossPath.move(to: NSPoint(x: 2 + inset, y: 2 + inset))
+        crossPath.line(to: NSPoint(x: 16 - inset, y: 16 - inset))
+        crossPath.move(to: NSPoint(x: 16 - inset, y: 2 + inset))
+        crossPath.line(to: NSPoint(x: 2 + inset, y: 16 - inset))
+        
+        crossPath.stroke()
+        
+        // Add running indicator in corner
+        let indicatorSize: CGFloat = 6
+        let indicatorRect = NSRect(x: size.width - indicatorSize - 1, y: 1, 
+                                 width: indicatorSize, height: indicatorSize)
+        let indicatorPath = NSBezierPath(ovalIn: indicatorRect)
+        
+        // Use a bright red for the indicator
+        let indicatorColor = NSColor.systemRed.blended(withFraction: 0.4, of: .white) ?? NSColor.systemRed
+        indicatorColor.setFill()
+        indicatorPath.fill()
+        
+        // Add white border to indicator for visibility
+        NSColor.white.setStroke()
+        indicatorPath.lineWidth = 0.5
+        indicatorPath.stroke()
+        
+        image.unlockFocus()
+        image.isTemplate = false
+        
+        return image
+    }
+    
+    private func createAnimatedStatusIcon(baseIcon: String, tintColor: NSColor, status: WorkflowStatus) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        
+        image.lockFocus()
+        
+        // Clear background
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        
+        // Draw the base icon (checkmark.circle, xmark.circle, or circle)
+        if let baseImage = NSImage(systemSymbolName: baseIcon, accessibilityDescription: "\(status)") {
+            let iconRect = NSRect(x: 1, y: 1, width: 16, height: 16)
+            
+            // Draw base icon with the specified color
+            if baseIcon == "circle" {
+                // For plain running state, draw a filled circle
+                let circlePath = NSBezierPath(ovalIn: iconRect)
+                tintColor.setFill()
+                circlePath.fill()
+                
+                // Add subtle border
+                let borderColor = tintColor.blended(withFraction: 0.3, of: .black) ?? tintColor
+                borderColor.setStroke()
+                circlePath.lineWidth = 0.5
+                circlePath.stroke()
+            } else {
+                // For checkmark.circle or xmark.circle, use the SF Symbol but tinted
+                let coloredImage = baseImage.copy() as! NSImage
+                coloredImage.lockFocus()
+                tintColor.set()
+                NSRect(origin: .zero, size: coloredImage.size).fill(using: .sourceAtop)
+                coloredImage.unlockFocus()
+                
+                coloredImage.draw(in: iconRect)
+            }
+        }
+        
+        // Add a small pulsing indicator in the corner to show "running" state
+        let indicatorSize: CGFloat = 6
+        let indicatorRect = NSRect(x: size.width - indicatorSize - 1, y: 1, 
+                                 width: indicatorSize, height: indicatorSize)
+        let indicatorPath = NSBezierPath(ovalIn: indicatorRect)
+        
+        // Use a brighter version of the main color for the indicator
+        let indicatorColor = tintColor.blended(withFraction: 0.4, of: .white) ?? tintColor
+        indicatorColor.setFill()
+        indicatorPath.fill()
+        
+        // Add white border to indicator for visibility
+        NSColor.white.setStroke()
+        indicatorPath.lineWidth = 0.5
+        indicatorPath.stroke()
+        
+        image.unlockFocus()
+        image.isTemplate = false
+        
+        return image
+    }
+    
     private func createCombinedStatusIcon(runningIcon: String, backgroundIcon: String, tintColor: NSColor, status: WorkflowStatus) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size)
@@ -778,7 +998,8 @@ public class StatusBarManager: NSObject {
         let backgroundColor: NSColor
         if backgroundIcon == "checkmark.circle" {
             backgroundColor = NSColor.systemGreen
-        } else if backgroundIcon == "xmark.circle" {
+        } else if backgroundIcon == "circle.fill" {
+            // For runningAfterFailure, use red background to indicate the last state was failed
             backgroundColor = NSColor.systemRed
         } else {
             backgroundColor = NSColor.systemGray

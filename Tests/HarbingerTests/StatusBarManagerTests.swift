@@ -511,6 +511,139 @@ final class StatusBarManagerTests: XCTestCase {
         XCTAssertTrue(true, "Build in progress diagnostic completed - see console output")
     }
     
+    func testVisualIconDisplay() {
+        StatusBarDebugger.shared.log(.lifecycle, "VISUAL ICON DISPLAY TEST")
+        
+        guard TestEnvironment.shouldRunFullGUITests() else {
+            StatusBarDebugger.shared.log(.state, "Skipping visual icon display in headless mode")
+            return
+        }
+        
+        // Create a window to display all status icons
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 600, height: 400),
+                             styleMask: [.titled, .closable, .resizable, .miniaturizable],
+                             backing: .buffered,
+                             defer: false)
+        window.title = "Harbinger Status Icons Visual Test"
+        window.level = .floating  // Make window float above others
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()  // Force window to front
+        
+        // Ensure the app is active to show the window
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Create main container view
+        let containerView = NSView(frame: window.contentView!.bounds)
+        containerView.autoresizingMask = [.width, .height]
+        window.contentView?.addSubview(containerView)
+        
+        // Create title label
+        let titleLabel = NSTextField(labelWithString: "Harbinger Status Icons")
+        titleLabel.font = NSFont.systemFont(ofSize: 18, weight: .bold)
+        titleLabel.frame = NSRect(x: 20, y: 350, width: 300, height: 30)
+        containerView.addSubview(titleLabel)
+        
+        // Create icons and labels
+        let statusStates: [(StatusBarManager.WorkflowStatus, String, String)] = [
+            (.unknown, "Unknown", "Gray question mark - initial state"),
+            (.passing, "Passing", "Green checkmark - all workflows successful"),
+            (.failing, "Failing", "Red circle - workflows failed (no harsh X)"),
+            (.running, "Running", "Blue circle - workflows currently running"),
+            (.runningAfterSuccess, "Running after Success", "Blue indicator over green background"),
+            (.runningAfterFailure, "Running after Failure", "Orange indicator over red background")
+        ]
+        
+        let startY: CGFloat = 300
+        let rowHeight: CGFloat = 50
+        
+        for (index, (status, title, description)) in statusStates.enumerated() {
+            let y = startY - CGFloat(index) * rowHeight
+            
+            // Create icon
+            let icon = statusBarManager.createStatusIcon(for: status)
+            let iconView = NSImageView(frame: NSRect(x: 30, y: y, width: 24, height: 24))
+            iconView.image = icon
+            containerView.addSubview(iconView)
+            
+            // Create title label
+            let titleLabel = NSTextField(labelWithString: title)
+            titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+            titleLabel.frame = NSRect(x: 70, y: y + 5, width: 150, height: 20)
+            titleLabel.isBezeled = false
+            titleLabel.isEditable = false
+            titleLabel.backgroundColor = NSColor.clear
+            containerView.addSubview(titleLabel)
+            
+            // Create description label
+            let descLabel = NSTextField(labelWithString: description)
+            descLabel.font = NSFont.systemFont(ofSize: 12)
+            descLabel.textColor = NSColor.secondaryLabelColor
+            descLabel.frame = NSRect(x: 230, y: y + 5, width: 350, height: 20)
+            descLabel.isBezeled = false
+            descLabel.isEditable = false
+            descLabel.backgroundColor = NSColor.clear
+            containerView.addSubview(descLabel)
+            
+            // Log icon properties
+            StatusBarDebugger.shared.log(.verification, "Icon created: \(title)", context: [
+                "size": "\(icon.size)",
+                "isTemplate": icon.isTemplate,
+                "representations": icon.representations.count
+            ])
+        }
+        
+        // Add close button
+        let closeButton = NSButton(frame: NSRect(x: 20, y: 20, width: 100, height: 30))
+        closeButton.title = "Close"
+        closeButton.bezelStyle = .rounded
+        closeButton.target = self
+        closeButton.action = #selector(closeIconWindow(_:))
+        containerView.addSubview(closeButton)
+        
+        // Store window reference for close action
+        iconDisplayWindow = window
+        
+        // Add instructions
+        let instructionLabel = NSTextField(labelWithString: "Visual test of all Harbinger status bar icons. Click Close or press Cmd+W to close.")
+        instructionLabel.font = NSFont.systemFont(ofSize: 11)
+        instructionLabel.textColor = NSColor.tertiaryLabelColor
+        instructionLabel.frame = NSRect(x: 20, y: 55, width: 550, height: 15)
+        instructionLabel.isBezeled = false
+        instructionLabel.isEditable = false
+        instructionLabel.backgroundColor = NSColor.clear
+        containerView.addSubview(instructionLabel)
+        
+        print("\n🎨 Visual Icon Display Window opened!")
+        print("You can see all status icons in the window that just appeared.")
+        print("The window shows the actual rendered icons as they would appear in the status bar.")
+        
+        // Keep the window open longer and add a timer to ensure visibility
+        print("Window created at level: \(window.level.rawValue)")
+        print("Window is visible: \(window.isVisible)")
+        print("Window frame: \(window.frame)")
+        
+        // Run the event loop briefly to ensure window appears
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
+        
+        // Keep the window open for a longer time during testing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
+            if let window = self?.iconDisplayWindow {
+                window.close()
+                self?.iconDisplayWindow = nil
+            }
+        }
+        
+        StatusBarDebugger.shared.log(.verification, "Visual icon display test completed")
+        XCTAssertTrue(true, "Visual icon display created successfully")
+    }
+    
+    private var iconDisplayWindow: NSWindow?
+    
+    @objc private func closeIconWindow(_ sender: NSButton) {
+        iconDisplayWindow?.close()
+        iconDisplayWindow = nil
+    }
+    
     private func gatherIconEvidence(for icon: NSImage?, statusName: String) -> [String: Any] {
         guard let icon = icon else {
             return ["error": "icon is nil", "statusName": statusName]
