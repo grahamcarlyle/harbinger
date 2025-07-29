@@ -770,33 +770,44 @@ public class StatusBarManager: NSObject {
         NSColor.clear.setFill()
         NSRect(origin: .zero, size: size).fill()
         
-        // Draw background status (last completed) at reduced opacity
-        if let backgroundImage = NSImage(systemSymbolName: backgroundIcon, accessibilityDescription: "background") {
-            backgroundImage.isTemplate = true
-            
-            // Draw background icon with reduced opacity to show last status
-            let backgroundRect = NSRect(x: 0, y: 0, width: size.width, height: size.height)
-            backgroundImage.draw(in: backgroundRect, from: .zero, operation: .sourceOver, fraction: 0.3)
+        // Draw background status circle (last completed) at reduced opacity
+        let backgroundRect = NSRect(x: 1, y: 1, width: 16, height: 16)
+        let backgroundPath = NSBezierPath(ovalIn: backgroundRect)
+        
+        // Determine background color based on the background icon
+        let backgroundColor: NSColor
+        if backgroundIcon == "checkmark.circle" {
+            backgroundColor = NSColor.systemGreen
+        } else if backgroundIcon == "xmark.circle" {
+            backgroundColor = NSColor.systemRed
+        } else {
+            backgroundColor = NSColor.systemGray
         }
         
-        // Draw running indicator (smaller, in corner) 
-        if let runningImage = NSImage(systemSymbolName: runningIcon, accessibilityDescription: "running") {
-            runningImage.isTemplate = true
-            
-            // Draw running icon smaller in the top-right corner
-            let runningSize = NSSize(width: size.width * 0.6, height: size.height * 0.6)
-            let runningRect = NSRect(x: size.width - runningSize.width, y: size.height - runningSize.height, 
-                                   width: runningSize.width, height: runningSize.height)
-            runningImage.draw(in: runningRect, from: .zero, operation: .sourceOver, fraction: 1.0)
-        }
+        // Draw background circle with reduced opacity
+        backgroundColor.withAlphaComponent(0.3).setFill()
+        backgroundPath.fill()
+        
+        // Draw running indicator (smaller circle in corner)
+        let runningSize: CGFloat = 8
+        let runningRect = NSRect(x: size.width - runningSize - 1, y: size.height - runningSize - 1, 
+                               width: runningSize, height: runningSize)
+        let runningPath = NSBezierPath(ovalIn: runningRect)
+        
+        // Fill running indicator with the specified tint color
+        tintColor.setFill()
+        runningPath.fill()
+        
+        // Add border to running indicator for definition
+        let borderColor = tintColor.blended(withFraction: 0.3, of: .black) ?? tintColor
+        borderColor.setStroke()
+        runningPath.lineWidth = 0.5
+        runningPath.stroke()
         
         image.unlockFocus()
-        image.isTemplate = true
         
-        // Apply combined tinting
-        DispatchQueue.main.async { [weak self] in
-            self?.statusItem?.button?.contentTintColor = tintColor
-        }
+        // Don't use template mode - we want full control over the appearance for combined icons
+        image.isTemplate = false
         
         return image
     }

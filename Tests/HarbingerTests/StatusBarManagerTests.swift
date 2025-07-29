@@ -329,6 +329,208 @@ final class StatusBarManagerTests: XCTestCase {
     
     
     
+    func testStatusBarIconVisibilityDiagnostic() {
+        StatusBarDebugger.shared.log(.lifecycle, "STATUS BAR ICON VISIBILITY DIAGNOSTIC TEST")
+        
+        guard TestEnvironment.shouldRunFullGUITests() else {
+            StatusBarDebugger.shared.log(.state, "Skipping visibility diagnostic in headless mode")
+            return
+        }
+        
+        // Test evidence collection for all status states
+        let statusStates: [StatusBarManager.WorkflowStatus] = [.unknown, .passing, .failing, .running, .runningAfterSuccess, .runningAfterFailure]
+        var evidenceData: [String: [String: Any]] = [:]
+        
+        for status in statusStates {
+            let icon = statusBarManager.createStatusIcon(for: status)
+            
+            // Gather comprehensive evidence about icon properties
+            var evidence: [String: Any] = [:]
+            evidence["status"] = "\(status)"
+            evidence["size"] = "\(icon.size)"
+            evidence["isTemplate"] = icon.isTemplate
+            evidence["representationCount"] = icon.representations.count
+            evidence["isEmpty"] = icon.representations.isEmpty
+            
+            // Analyze template vs non-template distinction
+            evidence["expectedToBeTemplate"] = (status == .unknown || status == .passing)
+            evidence["templateMismatch"] = icon.isTemplate != (status == .unknown || status == .passing)
+            
+            // Check for actual image data
+            if let rep = icon.representations.first {
+                evidence["hasImageData"] = true
+                evidence["representationType"] = "\(type(of: rep))"
+                
+                // Try to get bitmap representation for color analysis
+                if let bitmapRep = rep as? NSBitmapImageRep {
+                    evidence["bitmapSize"] = "\(bitmapRep.size)"
+                    evidence["hasAlpha"] = bitmapRep.hasAlpha
+                    evidence["bitsPerPixel"] = bitmapRep.bitsPerPixel
+                } else if let cgImageRep = rep as? NSImageRep {
+                    evidence["imageRepSize"] = "\(cgImageRep.size)"
+                }
+            } else {
+                evidence["hasImageData"] = false
+            }
+            
+            // Test if icon would be visible by attempting to draw it
+            let testImage = NSImage(size: NSSize(width: 18, height: 18))
+            testImage.lockFocus()
+            icon.draw(in: NSRect(origin: .zero, size: testImage.size))
+            testImage.unlockFocus()
+            
+            evidence["drawableTest"] = !testImage.representations.isEmpty
+            
+            evidenceData["\(status)"] = evidence
+            
+            StatusBarDebugger.shared.log(.verification, "Evidence collected for \(status)", context: evidence)
+        }
+        
+        // Analysis: Identify problematic status states
+        var problematicStates: [String] = []
+        var templateStates: [String] = []
+        var nonTemplateStates: [String] = []
+        
+        for (statusName, evidence) in evidenceData {
+            let isTemplate = evidence["isTemplate"] as? Bool ?? false
+            let hasImageData = evidence["hasImageData"] as? Bool ?? false
+            let isDrawable = evidence["drawableTest"] as? Bool ?? false
+            let templateMismatch = evidence["templateMismatch"] as? Bool ?? false
+            
+            if isTemplate {
+                templateStates.append(statusName)
+            } else {
+                nonTemplateStates.append(statusName)
+            }
+            
+            // Flag states that might have visibility issues
+            if isTemplate || !hasImageData || !isDrawable || templateMismatch {
+                problematicStates.append(statusName)
+            }
+        }
+        
+        // Create summary evidence report
+        let summaryEvidence: [String: Any] = [
+            "totalStatesAnalyzed": statusStates.count,
+            "templateStates": templateStates,
+            "nonTemplateStates": nonTemplateStates,
+            "problematicStates": problematicStates,
+            "templateStateCount": templateStates.count,
+            "problemCount": problematicStates.count
+        ]
+        
+        StatusBarDebugger.shared.log(.verification, "DIAGNOSTIC SUMMARY", context: summaryEvidence)
+        
+        // Store evidence for further analysis (test passes regardless - this is diagnostic)
+        StatusBarDebugger.shared.log(.verification, "Complete evidence data collected", context: evidenceData)
+        
+        // Output key findings
+        print("\n========== STATUS BAR ICON VISIBILITY DIAGNOSTIC RESULTS ==========")
+        print("Template states (potentially invisible): \(templateStates)")
+        print("Non-template states (should be visible): \(nonTemplateStates)")
+        print("Problematic states detected: \(problematicStates)")
+        print("====================================================================\n")
+        
+        // This test always passes - it's purely diagnostic
+        XCTAssertTrue(true, "Diagnostic test completed - see evidence in logs")
+    }
+    
+    func testBuildInProgressAtStartupScenario() {
+        StatusBarDebugger.shared.log(.lifecycle, "BUILD IN PROGRESS AT STARTUP SCENARIO TEST")
+        
+        guard TestEnvironment.shouldRunFullGUITests() else {
+            StatusBarDebugger.shared.log(.state, "Skipping build in progress diagnostic in headless mode")
+            return
+        }
+        
+        // Simulate the specific scenario: "build in progress when app starts"
+        // This tests the exact conditions that cause blank/faint icons
+        
+        print("\n========== BUILD IN PROGRESS AT STARTUP DIAGNOSTIC ==========")
+        
+        // Test 1: Simulate startup with no build in progress (should be clear)
+        StatusBarDebugger.shared.log(.verification, "TEST 1: Startup with no build in progress")
+        let clearStartupIcon = statusBarManager.createStatusIcon(for: .passing)
+        let clearEvidence = gatherIconEvidence(for: clearStartupIcon, statusName: "passing_at_startup")
+        print("Clear startup (.passing): \(clearEvidence)")
+        
+        // Test 2: Simulate startup with running build (should be blank/faint)
+        StatusBarDebugger.shared.log(.verification, "TEST 2: Startup with running build")
+        let runningStartupIcon = statusBarManager.createStatusIcon(for: .running)
+        let runningEvidence = gatherIconEvidence(for: runningStartupIcon, statusName: "running_at_startup")
+        print("Running startup (.running): \(runningEvidence)")
+        
+        // Test 3: Simulate startup with running after success (likely culprit)
+        StatusBarDebugger.shared.log(.verification, "TEST 3: Startup with running after success")
+        let runningAfterSuccessIcon = statusBarManager.createStatusIcon(for: .runningAfterSuccess)
+        let runningAfterSuccessEvidence = gatherIconEvidence(for: runningAfterSuccessIcon, statusName: "runningAfterSuccess_at_startup")
+        print("Running after success startup: \(runningAfterSuccessEvidence)")
+        
+        // Test 4: Simulate startup with running after failure
+        StatusBarDebugger.shared.log(.verification, "TEST 4: Startup with running after failure")
+        let runningAfterFailureIcon = statusBarManager.createStatusIcon(for: .runningAfterFailure)
+        let runningAfterFailureEvidence = gatherIconEvidence(for: runningAfterFailureIcon, statusName: "runningAfterFailure_at_startup")
+        print("Running after failure startup: \(runningAfterFailureEvidence)")
+        
+        // Test 5: Simulate status transition from clear to problematic
+        StatusBarDebugger.shared.log(.verification, "TEST 5: Status transition simulation")
+        
+        // Create initial clear icon
+        let initialIcon = statusBarManager.createStatusIcon(for: .passing)
+        let initialEvidence = gatherIconEvidence(for: initialIcon, statusName: "initial_passing")
+        print("Initial passing state: \(initialEvidence)")
+        
+        // Simulate transition to running state (what happens when build starts)
+        let transitionIcon = statusBarManager.createStatusIcon(for: .running)
+        let transitionEvidence = gatherIconEvidence(for: transitionIcon, statusName: "transition_to_running")
+        print("After transition to running: \(transitionEvidence)")
+        
+        // Note: Cannot test updateStatusIcon method directly due to private access
+        // Will focus on createStatusIcon method which is public
+        
+        // Compare problematic vs working states
+        let problemStates: [StatusBarManager.WorkflowStatus] = [.running, .runningAfterSuccess, .runningAfterFailure]
+        let workingStates: [StatusBarManager.WorkflowStatus] = [.passing, .failing]
+        
+        print("\n--- COMPARISON: PROBLEMATIC vs WORKING STATES ---")
+        for status in problemStates {
+            let icon = statusBarManager.createStatusIcon(for: status)
+            let evidence = gatherIconEvidence(for: icon, statusName: "\(status)")
+            print("PROBLEMATIC \(status): \(evidence)")
+        }
+        
+        for status in workingStates {
+            let icon = statusBarManager.createStatusIcon(for: status)
+            let evidence = gatherIconEvidence(for: icon, statusName: "\(status)")
+            print("WORKING \(status): \(evidence)")
+        }
+        
+        print("================================================================\n")
+        
+        StatusBarDebugger.shared.log(.verification, "Build in progress diagnostic completed")
+        XCTAssertTrue(true, "Build in progress diagnostic completed - see console output")
+    }
+    
+    private func gatherIconEvidence(for icon: NSImage?, statusName: String) -> [String: Any] {
+        guard let icon = icon else {
+            return ["error": "icon is nil", "statusName": statusName]
+        }
+        
+        var evidence: [String: Any] = [:]
+        evidence["statusName"] = statusName
+        evidence["size"] = "\(icon.size)"
+        evidence["isTemplate"] = icon.isTemplate
+        evidence["representationCount"] = icon.representations.count
+        evidence["isEmpty"] = icon.representations.isEmpty
+        
+        if let rep = icon.representations.first {
+            evidence["representationType"] = "\(type(of: rep))"
+            evidence["representationSize"] = "\(rep.size)"
+        }
+        
+        return evidence
+    }
+    
     @objc private func dummyAction(_ sender: NSMenuItem) {
         // Dummy action for testing
     }
