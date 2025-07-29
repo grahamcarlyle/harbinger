@@ -13,6 +13,10 @@ let package = Package(
             name: "Harbinger",
             targets: ["HarbingerApp"]
         ),
+        .executable(
+            name: "IconViewer",
+            targets: ["IconViewer"]
+        ),
         .library(
             name: "HarbingerCore",
             targets: ["HarbingerCore"]
@@ -23,6 +27,11 @@ let package = Package(
             name: "HarbingerApp",
             dependencies: ["HarbingerCore"],
             path: "Sources/App"
+        ),
+        .executableTarget(
+            name: "IconViewer",
+            dependencies: ["HarbingerCore"],
+            path: "Sources/IconViewer"
         ),
         .target(
             name: "HarbingerCore",
