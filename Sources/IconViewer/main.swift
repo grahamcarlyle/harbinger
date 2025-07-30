@@ -5,6 +5,23 @@ import Foundation
 class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     
+    private func getSemanticColor(for status: StatusIconFactory.WorkflowStatus) -> NSColor {
+        switch status {
+        case .unknown:
+            return NSColor.secondaryLabelColor
+        case .passing:
+            return NSColor.systemGreen
+        case .failing:
+            return NSColor.systemRed
+        case .running:
+            return NSColor.systemBlue
+        case .runningAfterSuccess:
+            return NSColor.systemGreen
+        case .runningAfterFailure:
+            return NSColor.systemRed
+        }
+    }
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         createIconDisplayWindow()
     }
@@ -35,8 +52,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             (.passing, "Passing", "Green checkmark - all workflows successful"),
             (.failing, "Failing", "Clear red X in circle - workflows failed"),
             (.running, "Running", "Blue play button - first workflow run"),
-            (.runningAfterSuccess, "Running after Success", "Green checkmark with bright running indicator"),
-            (.runningAfterFailure, "Running after Failure", "Red X with bright running indicator")
+            (.runningAfterSuccess, "Running after Success", "Green checkmark with small circle indicator - workflows running, last completed successfully"),
+            (.runningAfterFailure, "Running after Failure", "Red X with small circle indicator - workflows running, last completed with failures")
         ]
         
         let startY: CGFloat = 350
@@ -48,6 +65,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let icon = StatusIconFactory.createStatusIcon(for: status)
             let iconView = NSImageView(frame: NSRect(x: 30, y: y, width: 32, height: 32))
             iconView.image = icon
+            
+            // Apply appropriate tinting for template images
+            if #available(macOS 10.14, *) {
+                iconView.contentTintColor = getSemanticColor(for: status)
+            }
+            
             containerView.addSubview(iconView)
             
             let titleLabel = NSTextField(labelWithString: title)

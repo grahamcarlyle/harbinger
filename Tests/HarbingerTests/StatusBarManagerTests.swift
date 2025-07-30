@@ -56,10 +56,9 @@ final class StatusBarManagerTests: XCTestCase {
                 // SF Symbols have variable sizes, just ensure they're reasonable
                 XCTAssertGreaterThan(icon.size.width, 0, "Icon should have positive width")
                 XCTAssertGreaterThan(icon.size.height, 0, "Icon should have positive height")
-                // Only untinted icons should be template images for theme support
-                // Tinted icons (failing, running, combined) are pre-tinted for better visibility
-                let shouldBeTemplate = (status == .unknown || status == .passing)
-                XCTAssertEqual(icon.isTemplate, shouldBeTemplate, "Icon template property should match expected behavior for \(status)")
+                // All icons should now be template images for Apple HIG compliance
+                // System will handle tinting automatically for proper dark/light mode support
+                XCTAssertTrue(icon.isTemplate, "All icons should be template images for HIG compliance: \(status)")
                 XCTAssertTrue(icon.representations.count > 0, "Icon should have image representations")
                 
                 StatusBarDebugger.shared.log(.verification, "Icon created successfully", context: ["color": colorName, "status": "\(status)"])
@@ -187,10 +186,9 @@ final class StatusBarManagerTests: XCTestCase {
             let icon = statusBarManager.createStatusIcon(for: internalStatus)
             XCTAssertNotNil(icon, "Should create icon for \(status) → \(internalStatus)")
             
-            // Only untinted icons should be template images for theme support
-            // Tinted icons (failing, running) are pre-tinted for better visibility
-            let shouldBeTemplate = (internalStatus == .unknown || internalStatus == .passing)
-            XCTAssertEqual(icon.isTemplate, shouldBeTemplate, "Icon template property should match expected behavior for \(internalStatus)")
+            // All icons should now be template images for Apple HIG compliance
+            // System will handle tinting automatically for proper dark/light mode support
+            XCTAssertTrue(icon.isTemplate, "All icons should be template images for HIG compliance: \(internalStatus)")
             
             XCTAssertGreaterThan(icon.size.width, 0, "Icon should have positive width for \(status)")
             XCTAssertGreaterThan(icon.size.height, 0, "Icon should have positive height for \(status)")
@@ -352,9 +350,9 @@ final class StatusBarManagerTests: XCTestCase {
             evidence["representationCount"] = icon.representations.count
             evidence["isEmpty"] = icon.representations.isEmpty
             
-            // Analyze template vs non-template distinction
-            evidence["expectedToBeTemplate"] = (status == .unknown || status == .passing)
-            evidence["templateMismatch"] = icon.isTemplate != (status == .unknown || status == .passing)
+            // All icons should now be template images (Apple HIG compliance)
+            evidence["expectedToBeTemplate"] = true
+            evidence["templateMismatch"] = !icon.isTemplate
             
             // Check for actual image data
             if let rep = icon.representations.first {
@@ -374,7 +372,7 @@ final class StatusBarManagerTests: XCTestCase {
             }
             
             // Test if icon would be visible by attempting to draw it
-            let testImage = NSImage(size: NSSize(width: 18, height: 18))
+            let testImage = NSImage(size: NSSize(width: 16, height: 16))
             testImage.lockFocus()
             icon.draw(in: NSRect(origin: .zero, size: testImage.size))
             testImage.unlockFocus()
